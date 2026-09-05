@@ -22,6 +22,6 @@
 
 ## 5. CI/CD workflow
 
-- [ ] 5.1 Add `.github/workflows/deploy.yml`: triggers on push to the default branch, runs `npm ci`, then `vitest run`, then `npm run build`, then uploads `dist/` via `actions/upload-pages-artifact` and deploys via `actions/deploy-pages`; verify by pushing and confirming the workflow run succeeds in the Actions tab
-- [ ] 5.2 In the GitHub repo's Settings > Pages, set the Pages source to "GitHub Actions" (manual one-time step)
-- [ ] 5.3 Verify the published site loads at `https://<username>.github.io/entropy-minesweeper/` with working navigation between the game and explainer pages
+- [x] 5.1 Add `.github/workflows/deploy.yml`: triggers on push to the default branch, runs `npm ci`, then `vitest run`, then `npm run build`, then uploads `dist/` via `actions/upload-pages-artifact` and deploys via `actions/deploy-pages`; verify by pushing and confirming the workflow run succeeds in the Actions tab
+- [x] 5.2 In the GitHub repo's Settings > Pages, set the Pages source to "GitHub Actions" (manual one-time step)
+- [x] 5.3 Verify the published site loads at `https://<username>.github.io/entropy-minesweeper/` with working navigation between the game and explainer pages
