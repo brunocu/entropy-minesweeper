@@ -1,0 +1,30 @@
+## 1. Component cache types and signature
+
+- [x] 1.1 Add `ComponentCacheEntry` (`enumeration: ComponentEnumeration`, optional `explanations`) and `ComponentCache = ReadonlyMap<string, ComponentCacheEntry>` types to `frontierSolver.ts`.
+- [x] 1.2 Add a `componentSignature(componentCells, relevantConstraints, flaggedCells)` helper producing the canonical string from design.md Decision D1 (sorted constraint tuples + sorted flagged-subset), and verify with a unit test that two calls with the same cells/constraints/flags in different insertion order produce an identical signature, and that changing any one input changes it.
+
+## 2. `solve`: required cache, shared enumeration
+
+- [x] 2.1 Switch `computeBaseSolve` to call `enumerateComponentFull` instead of `enumerateComponent` per component (using `.assignments` as before) and verify existing `frontierSolver.test.ts`/`frontierSolver.spec.test.ts` probability/EIG assertions still pass unmodified (confirms this swap is behavior-preserving on its own).
+- [x] 2.2 Change `solve`'s signature to `solve(board, previousCache: ComponentCache): SolveWithCache` (`{ result, cache }`): per component, compute its signature; on a hit reuse the cached `enumeration` (and carry over any cached `explanations`) into the returned cache; on a miss run `enumerateComponentFull`, store `{ enumeration, explanations: undefined }`. Build the returned cache from scratch each call (only current components), per design.md D4.
+- [x] 2.3 Update every existing `solve` call site to the new signature: `solver.worker.ts` (keep one `ComponentCache` per worker instance, reassigned from each call's returned `cache`, call `solve(message.board, cache).result` for the response payload), and `revealFeedback.test.ts`, `solverWorker.test.ts`, `informationVisualization.spec.test.ts`, `stateExport.test.ts` (each call site passes `new Map()` and destructures `.result`, since none of them are testing cross-call cache reuse). Verify the full existing assertions in each of those files still pass.
+- [x] 2.4 Add a test that calling `solve` twice in a row on an unchanged board, threading the first call's returned cache into the second, does not re-run `enumerateComponentFull`'s backtracking for any component (e.g. via a spy/call-count probe), while a board change between the two calls does trigger a fresh enumeration for the affected component(s) only.
+
+## 3. Reshape `computeExplanations` around the cache
+
+- [x] 3.1 Change `computeExplanations`'s signature to `(board, solveResult, flaggedCells, previousCache: ComponentCache): ExplanationsWithCache` (required cache, `{ explanations, cache }` return). Update `frontierSolver.test.ts`'s call sites (currently calling with 2-3 args and using the bare Map return, e.g. `.get(...)`) to pass a cache (`new Map()` where no reuse is being tested) and destructure `.explanations`, and verify all existing explanation-content assertions still pass.
+- [x] 3.2 Per component: if `previousCache`'s entry for that signature has `enumeration`, reuse it instead of calling `enumerateComponentFull` directly; otherwise compute fresh. Verify with a test that reusing a `solve`-produced cache (from task 2.4) means `computeExplanations` performs zero fresh enumeration for components `solve` already populated this move.
+- [x] 3.3 Per component: if the cache entry already has `explanations`, copy them into the result directly for that component's certain cells; otherwise run `computeExplanationForCell` for each and populate `explanations` in the returned entry. Verify with a new test: call `computeExplanations` twice with the same board and the first call's returned cache threaded into the second, and confirm (via a call-count probe on the grow/trim entry point, e.g. spying on `resolvesTo`/`enumerateComponent` invocations) that the second call performs no new grow/trim search.
+- [x] 3.4 Verify with a test that a `toggleFlag()`-shaped call (same board/constraints, only `flaggedCells` changed) on a cell **not** in any frontier component returns a cache whose every component entry (and its `explanations`) is reference-identical or value-identical to the previous cache's entries - confirming proposal.md's "toggleFlag on a cell outside the frontier becomes a full cache hit" claim.
+- [x] 3.5 Verify with a test that a `toggleFlag()`-shaped call on a cell that **is** part of a frontier component only recomputes that one component's entry (new `enumeration` and `explanations`) while every other component's cached entry is carried over unchanged.
+- [x] 3.6 Verify with a test that a component signature present in one call's returned cache is absent from a later call's returned cache once a board change removes that component (e.g. a reveal that clears its frontier cells) - confirming the implicit pruning from design.md D4.
+
+## 4. Wire `GameController`
+
+- [x] 4.1 Change the local `Solve` type to `(board: Board, cache: ComponentCache) => SolveWithCache`, default it to `solve`, and add a `componentCache: ComponentCache` field (initialized to `new Map()`) threaded through the constructor, `reveal()`, and `toggleFlag()` - each call site reassigns `this.componentCache` from the `cache` field of whichever result it just received.
+- [x] 4.2 Update `gameController.test.ts`'s `vi.fn(() => ({...}))` solver stubs to return `{ result: {...}, cache: new Map() }` matching the new `Solve` return shape, and confirm the full suite passes.
+- [x] 4.3 Run the full existing test suite (`gameController.test.ts`, `frontierSolver.test.ts`, `frontierSolver.spec.test.ts`, `revealFeedback.test.ts`, `solverWorker.test.ts`, `informationVisualization.spec.test.ts`, `stateExport.test.ts`) and confirm everything passes, confirming output is unchanged end to end apart from the updated call sites from tasks 2.3/3.1/4.2.
+
+## 5. Performance validation
+
+- [x] 5.1 On an Expert-sized board (30x16, 99 mines) with a large, mostly-solved frontier, measure wall-clock time of `reveal()`/`toggleFlag()` before and after this change (e.g. a small benchmark script or targeted timing test) and confirm a measurable reduction, addressing the multi-second hang reported in proposal.md's Why.

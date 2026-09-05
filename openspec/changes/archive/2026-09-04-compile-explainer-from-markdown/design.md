@@ -1,0 +1,89 @@
+## Context
+
+`explainer.html` is a real Vite HTML entry compiled by `src/explainer/compileExplainer.ts`, called from a `transformIndexHtml` plugin in `vite.config.ts` scoped to that one entry (`index.html` is untouched) — this build wiring is already in place and does not change in this revision. The compiler currently uses `marked`: parse `explainer.md`'s Markdown, run `substituteFigures()` over the output to inject the real `data-figure` values (computed once, in `computeFigureValues()`, from the same solver/graph calls `figures.test.ts` uses), and splice the result into `explainer.html`'s shell at an HTML-comment placeholder.
+
+Two limitations of `marked`'s model motivate this revision:
+
+1. **Raw HTML blocks are opaque.** `marked` recognizes a `<div>`/`<figure>`/`<figcaption>` starting a line as an HTML block and passes everything inside it through verbatim, with zero Markdown parsing — confirmed empirically this session. That's why `.callout`, `.lede`, and every figure caption still carry literal `<a>`/`<code>`/`<strong>` tags instead of Markdown syntax, and why `<span class="math">` sitting in ordinary prose text needed a token-protection pass (`protectInlineSpans()` in the current `compileExplainer.ts`) to stop CommonMark's backslash-escape rule from eating `\(`, `\{`, etc.
+2. **MathJax wiring is hand-maintained HTML**, not generated: a pinned CDN `<script>`, an inline `window.MathJax = {...}` config block, and a `math-pending` class toggled by an inline script, all typed directly into `explainer.html`'s `<head>`.
+
+Researched this session and worth recording:
+- No package does directive-name-to-HTML mapping automatically. `remark-directive` only parses `:::name`/`::name[label]`/`:name[content]` syntax into generic mdast nodes; its own README states "directives don't handle themselves." `remark-directive-rehype` (v1.0.0, actively published) is a structural bridge to `remark-rehype`, not a name→HTML mapper. A hand-written mapping (via `data.hName`/`data.hProperties` on each directive node, or `remark-rehype`'s `handlers` option) is unavoidable wherever directives are used.
+- `remark-gfm` (adds tables/strikethrough/footnotes/task-lists/autolinks) composes without conflicts alongside `remark-directive`/`remark-math`, but `marked` already implements GFM natively, and this change doesn't adopt it (see Decision 2 below — the GFM-alert plugin used for `.callout` doesn't require it either).
+- `rehype-mathjax` has three output modes: `svg`/`chtml` render at build time (dropping the client runtime entirely — explicitly out of scope for this change, since the goal is toolchain-generated wiring, not a rendering-architecture change), and `browser`, which only emits the config/markup needed for a client-side MathJax runtime to pick up — architecturally the same "typeset in the browser" model this page already uses, just toolchain-generated instead of hand-typed.
+- `rehype-mathjax` depends on `mathjax-full`, the MathJax **v3** line. This project currently pins MathJax **v4** (`@mathjax/src` as a test-only devDependency, and `mathjax@4.1.3` on the CDN in the shell). Explicitly accepted for this change: downgrade to whatever MathJax version `rehype-mathjax`'s current `mathjax-full` peer dependency requires, project-wide, so there is exactly one MathJax version in play rather than a v3/v4 split.
+- **Directive scope was reconsidered mid-design.** The first draft of this change put `remark-directive` on `.callout`, `.lede`, and the four `.term-*` spans — exactly the cases where it's weakest (wrapping a single class around content with no internal structure worth parsing) — and left it out of figures, where it's actually strong (nesting: an image plus a caption whose prose deserves real Markdown). Corrected per review:
+  - **`.callout`** doesn't need a bespoke directive at all — `remark-github-markdown-alerts` (npm, v1.2.2, published Oct 2025, actively maintained) implements GitHub's `> [!NOTE]` alert blockquote syntax, and its `classNames`/`tags` options are fully overridable, so it can emit the existing `.callout` div/class structure instead of GitHub's own `markdown-alert` styling. No `remark-gfm` dependency needed (GitHub alerts are a GitHub convention layered on GFM blockquotes, not part of the core GFM spec).
+  - **`.lede`** needs no plugin or markup at all: it is always the paragraph immediately following `<h1>`, so the stylesheet can target it structurally (`h1 + p`, scoped under `#explainer`) instead of via a class.
+  - **`.term-*`** has no maintained Pandoc-style `{.class}`-attribute plugin available (`remark-attr` is abandoned since 2020; `remark-fenced-divs` and `remark-bracketed-spans` are archived/stale) — but since `remark-directive` is already a required dependency for figures, mapping these four spans to its inline text-directive form (`:term-safe[...]` etc.) costs nothing extra and removes the last raw HTML from the prose body.
+  - **Figures** become the actual justified use of `remark-directive`: a container directive per figure (nesting a `figcaption` container inside it) lets caption prose use real Markdown, while the `<img>` tags — and, for the two-image figures, their wrapper divs — stay as raw HTML inside the directive body via `rehype-raw`, which the pipeline needs regardless (for the demo widget).
+
+## Goals / Non-Goals
+
+**Goals:**
+- Every figure becomes a `::: figure` / `::: figcaption` container directive pair whose caption is real, fully-parsed Markdown — `<a>`, `` ` ` ``, `**...**` in captions become actual Markdown syntax, no more literal HTML for caption prose. The `<img>` tags (and two-image wrapper divs) stay as raw HTML inside the directive body.
+- `.term-safe`/`.term-mine`/`.term-clue`/`.term-premise` move to `remark-directive`'s inline text-directive form, reusing the same mapping plugin figures need — no added dependency cost.
+- `.callout` moves to `> [!NOTE]` GFM alert syntax via `remark-github-markdown-alerts`, configured to emit the existing `.callout` markup.
+- `.lede` is retargeted via a structural CSS selector; the class and any special markdown-side markup are dropped.
+- Math source syntax moves to `$...$` / `$$...$$` (parsed by `remark-math`), rendered through `rehype-mathjax/browser`.
+- The MathJax wiring in `explainer.html`'s `<head>` is generated by the compiler pipeline rather than hand-typed, using whatever `rehype-mathjax/browser` currently emits.
+- `compileExplainer()`'s external contract is unchanged: `(shellHtml: string, markdown: string) => string`. `vite.config.ts`'s plugin and the placeholder-splicing mechanism in the shell are unaffected.
+- Figures, the certainty-cell highlighting, and the predicted-vs-realized demo keep rendering and behaving exactly as before.
+
+**Non-Goals:**
+- No build-time math typesetting (`rehype-mathjax/svg` or `/chtml`) — the runtime rendering model (client-side MathJax) stays the same; only its generation method and version change.
+- No directive syntax for the demo widget — its structure (`<canvas>`/`<dl>`/`<button>`) doesn't map onto a directive with useful semantics, so it stays raw embedded HTML, passed through via `rehype-raw` exactly as `marked` passed it through today.
+- No `remark-gfm` — nothing in the article needs GFM tables/footnotes/task-lists, and the alert plugin doesn't require it.
+- No change to `illustrations.ts`, the solver, or any runtime/game code.
+
+## Decisions
+
+**1. Engine: `unified` + `remark-parse` + `remark-directive` + `remark-math` + `remark-rehype` + `rehype-raw` + `rehype-mathjax` + `rehype-stringify` + `remark-github-markdown-alerts`, replacing `marked`.**
+This reverses the prior decision to use `marked` (a single lightweight dependency) in favor of the heavier, composable `remark`/`rehype` stack, specifically because it's the only path to generating the MathJax wiring from the same tool that compiles the prose, and because letting figure captions get properly Markdown-parsed requires a real AST-based pipeline, not a passthrough-HTML tokenizer.
+
+**2. Directives are scoped to figures and term spans — not to every custom class.**
+`remark-directive` produces generic `containerDirective`/`leafDirective`/`textDirective` mdast nodes; nothing maps a directive name to HTML automatically (confirmed — no such package exists), so a hand-written mapping plugin is required wherever it's used. That cost is only worth paying where a directive's nesting actually matters:
+- **Figures**: `figure` (container, containing raw `<img>`/wrapper-div HTML plus a nested `figcaption` container) → `<figure class="...">`, and `figcaption` (container) → `<figcaption>`, whose Markdown content is genuinely parsed.
+- **Term spans**: `term-safe`/`term-mine`/`term-clue`/`term-premise` (text directives) → `span.term-*`. These have no internal structure worth parsing, but the mapping plugin already exists for figures, so adding four more name→tag entries costs nothing.
+
+Write one remark plugin (using `unist-util-visit`) that walks directive nodes and sets `node.data.hName`/`node.data.hProperties` for exactly these six names. Any other directive name is left unhandled and should fail loudly (throw) rather than silently pass through, so a typo in `explainer.md` doesn't ship as broken markup.
+
+**`.callout` and `.lede` deliberately do NOT use `remark-directive`** (see the mid-design correction above): `.callout` uses the more idiomatic, purpose-built `remark-github-markdown-alerts` (GFM alert syntax is a widely-recognized convention, and the plugin's `classNames`/`tags` config can target the alert type used - most likely `note` - to `.callout`'s existing markup instead of adding a mapping to the directive plugin). Whether the plugin can fully suppress the alert's title bar (today's `.callout` has none) needs verification at implementation time against its current README/options - if not, fall back to a custom rehype transform stripping the title node, or accept a minimal title. `.lede` needs no markup change at all (see Decision 3).
+
+**3. `.lede`: drop the class, retarget via a structural CSS selector.**
+The lede is always the paragraph immediately following `<h1>` — no directive, attribute plugin, or markdown-side syntax is needed. Change the stylesheet's `.lede` rule to something like `#explainer h1 + p` (verify against the actual compiled DOM once figures/captions are also directives, in case paragraph nesting shifts under the new pipeline).
+
+**4. Figures, figcaptions become directives; the demo widget stays raw HTML.**
+The demo widget's structure (`<canvas>`/`<dl>`/`<button>`) doesn't reduce to a directive with useful semantics, so it stays embedded raw HTML, passed through via `remark-rehype`'s `allowDangerousHtml: true` + `rehype-raw` — required in the pipeline regardless (also needed for the raw `<img>` HTML nested inside figure directives), so there's no marginal dependency cost to keeping it as HTML.
+
+**5. Math: `remark-math` for source syntax, `rehype-mathjax/browser` for wiring, MathJax version downgrade accepted.**
+`browser` mode keeps the existing "typeset in the client" architecture (matching this page's current behavior and this change's Non-Goals) while still moving the config/script generation into the compiler. Its `mathjax-full` (v3) dependency conflicts with this project's existing v4 usage (`@mathjax/src`, `mathjax@4.1.3` CDN); resolved by downgrading project-wide to whatever version `rehype-mathjax` currently requires, rather than carrying two MathJax majors. The exact config/markup `rehype-mathjax/browser` emits, and the exact `mathjax-full`-compatible CDN version to pin, must be verified against current package docs at implementation time (per project convention: do not assume a training-data recollection of a versioned API/config shape is current) — do not hand-copy the shape of today's config block and assume it still matches.
+- `mathSyntax.test.ts`'s current approach (parse every formula with a real MathJax input/output pipeline, fail on `merror` nodes, using `@mathjax/src` directly) needs a decision at implementation time: keep it pointed at whatever MathJax version replaces `@mathjax/src`, or retire it if the new pipeline surfaces bad TeX some other way (e.g. `rehype-mathjax` itself may report parse errors during compilation, which would make a separate standalone check partly redundant). Default to keeping an equivalent check unless it's proven redundant — silently dropping TeX validation is not an acceptable simplification.
+
+**6. `data-figure` injection stays exactly as-is: post-processing on the final HTML string.**
+`computeFigureValues()` and `substituteFigures()` (in the current `compileExplainer.ts`) don't depend on which Markdown engine produced the HTML they operate on — no change needed here.
+
+## Risks / Trade-offs
+
+- **`remark-github-markdown-alerts`'s title-bar may not be fully suppressible**, which would leave a small "Note" label on the callout that doesn't exist today → mitigated by checking its current config options at implementation time; if unremovable via config, a small custom rehype transform stripping the title node is a cheap fallback.
+- **`rehype-mathjax/browser`'s exact output shape and current `mathjax-full`-compatible version are unverified as of writing this design** (research this session found versions/architecture but not the literal generated markup) → mitigated by treating this as a required implementation-time spike: render one or two of the article's more complex formulas (e.g. the ones using `\binom`, `\operatorname`, nested `\tfrac`) and manually confirm they typeset correctly in a browser before converting the rest of `explainer.md`'s ~70 inline math spans and 9 display divs.
+- **MathJax version downgrade could change formula rendering in subtle ways** (different glyph metrics, spacing, or `mjx-container` internals between v3 and v4) → accepted per explicit product decision; verify visually (task 5 in tasks.md) rather than assuming pixel-identical output the way the rest of this migration is verified by byte-diffing.
+- **Directive syntax errors fail differently than today's raw HTML** (a typo in a directive name throws per Decision 2, rather than silently rendering as literal text) → considered a feature, not a risk: today a typo inside a raw HTML block silently ships as broken markup with no signal.
+- **Bigger dependency surface** (9 new packages replacing 1) — accepted given the math-wiring generation goal can't be reached with `marked`; not taken lightly, recorded here as the explicit reversal of the prior proposal's decision 1.
+- **Re-verification burden**: the prose/directive conversion can be verified the same way the `marked` migration was (byte-diff against the previously-working compiled output, ignoring whitespace) for everything except math, which has no "before" to diff against once the version changes — math needs the visual spike above instead.
+
+## Migration Plan
+
+1. Research current exact versions and confirm `rehype-mathjax/browser`'s emitted markup/config shape, its required `mathjax-full`-compatible CDN version, and `remark-github-markdown-alerts`'s title-suppression options (implementation-time, not assumed here).
+2. Add dependencies: `unified`, `remark-parse`, `remark-directive`, `remark-math`, `remark-rehype`, `rehype-raw`, `rehype-mathjax`, `rehype-stringify`, `unist-util-visit`, `remark-github-markdown-alerts`. Remove `marked`.
+3. Write the directive-to-hast mapping plugin (Decision 2: `figure`/`figcaption`/`term-*` only) and a standalone unit test for it (small inline fixture, not the real content), extending `compileExplainer()`'s existing unit-test pattern. Separately configure `remark-github-markdown-alerts` to emit `.callout`'s existing markup and verify with its own small fixture test.
+4. Rebuild `compileExplainer()`'s internals around the `unified()` pipeline from Decision 1, keeping `computeFigureValues()`/`substituteFigures()` unchanged and applied as today.
+5. Spike the math rendering (Risk 1): pick 2-3 representative formulas, run them through the new pipeline, confirm correct browser rendering, before touching the rest of `explainer.md`.
+6. Rewrite `explainer.md`: the `.callout` div → `> [!NOTE] ...`; every figure/figcaption → `::: figure` / `::: figcaption` container directives (raw `<img>`/wrapper-div HTML preserved inside); `.term-*` spans → text directives; math spans/divs → `$...$`/`$$...$$`. The demo widget block is untouched. No `.lede` markup change (Decision 3).
+7. Update the stylesheet: retarget `.lede` to a structural selector; retarget `.callout` if `remark-github-markdown-alerts`'s output shape needs a different selector than today's hand-written div.
+8. Regenerate `explainer.html`'s `<head>` MathJax wiring to match whatever the new pipeline requires; verify the rest of the shell (back-link, placeholder, everything outside the MathJax block) is unchanged.
+9. Byte-diff (ignoring whitespace) the compiled output's non-math content against the last known-good `marked`-based output; visually verify math against the spike from step 5, and the callout/lede/figures against the live page.
+10. Update `explainerPage.test.ts`'s MathJax assertions to match the new wiring; decide and implement `mathSyntax.test.ts`'s fate per Decision 5; confirm `figures.test.ts`/`illustrationFiles.test.ts`/`compileExplainer.test.ts` still pass (their approach doesn't need to change, only what they exercise internally).
+11. Run the full suite, `tsc --noEmit`, `npm run build`, `npm run dev`, and a manual browser check (figures, captions, callout, math, certainty highlight, demo widget) exactly as done for the `marked` migration.
+
+Rollback: revert to the `marked`-based `compileExplainer.ts`, `explainer.md`, and `explainer.html` from before this change if the math spike or visual verification fails — nothing user-facing or persisted is at stake either way.

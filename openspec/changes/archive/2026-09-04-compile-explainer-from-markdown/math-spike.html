@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MathJax v3 spike</title>
+    <style>
+      body { font-family: system-ui, sans-serif; font-size: 18px; padding: 2rem; max-width: 40rem; margin: 0 auto; }
+      .item { margin: 2rem 0; padding: 1rem; border: 1px solid #ddd; border-radius: 6px; }
+      .item h3 { margin-top: 0; font-size: 0.9rem; color: #666; }
+    </style>
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['\\(', '\\)']],
+          displayMath: [['\\[', '\\]']],
+        },
+      }
+    </script>
+    <script
+      id="MathJax-script"
+      async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"
+      integrity="sha384-KKWa9jJ1MZvssLeOoXG6FiOAZfAgmzsIIfw8BXwI9+kYm0lPCbC6yTQPBC00F1/L"
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <h1>MathJax v3.2.2 rendering spike</h1>
+    <p>Three representative formulas from the explainer article, run through the new pipeline's math delimiters.</p>
+    <div class="item">
+      <h3>\binom (from eq. 3)</h3>
+      <span class="math">\(\binom{K}{R(a)}\)</span>
+    </div>
+    <div class="item">
+      <h3>\operatorname (from eq. 6)</h3>
+      <div class="math-display">\[\operatorname{EIG}(x) = H(W) - \sum_o P(O_x = o) \, H(W \mid O_x = o) = I(W ; O_x)\]</div>
+    </div>
+    <div class="item">
+      <h3>nested \tfrac + \operatorname (from eq. 8)</h3>
+      <div class="math-display">\[\operatorname{EIG}(\text{A2}) = H\!\left(\tfrac{1}{2}, \tfrac{1}{4}, \tfrac{1}{4}\right) =
+        -\tfrac{1}{2}\log_2\tfrac{1}{2} - 2 \cdot \tfrac{1}{4}\log_2\tfrac{1}{4} = 1.5 \text{ bits.}\]</div>
+    </div>
+  </body>
+</html>
