@@ -88,8 +88,12 @@ function explainerIllustrations(): Plugin {
 
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
-        const path = request.url?.split('?')[0]?.replace(/^\//, '')
-        if (!path) return next()
+        const url = request.url?.split('?')[0]
+        if (!url) return next()
+        // The dev server serves everything under `base`, so a request for an emitted illustration
+        // arrives as e.g. `/entropy-minesweeper/assets/explainer/foo.svg`, not the bare
+        // `assets/explainer/foo.svg` fileName the illustrations are keyed by.
+        const path = url.startsWith(base) ? url.slice(base.length) : url.replace(/^\//, '')
         // Regenerated per request so a change to a fixture or generator shows up on reload.
         const file = buildIllustrationFiles().find((candidate) => candidate.fileName === path)
         if (!file) return next()

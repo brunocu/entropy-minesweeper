@@ -11,14 +11,14 @@
 
 ## 3. Local verification of subpath behavior
 
-- [ ] 3.1 Run `npm run build`, then `npm run preview -- --base /entropy-minesweeper/` (or equivalent), and manually confirm in a browser: the game page loads, the explainer link navigates correctly, the explainer page's diagrams render, and the back-link returns to the game — all under the `/entropy-minesweeper/` prefix
+- [x] 3.1 Run `npm run build`, then `npm run preview -- --base /entropy-minesweeper/` (or equivalent), and manually confirm in a browser: the game page loads, the explainer link navigates correctly, the explainer page's diagrams render, and the back-link returns to the game — all under the `/entropy-minesweeper/` prefix
 - [x] 3.2 Run `vitest run` and confirm the full suite still passes after the above changes
 
 ## 4. Git and GitHub repo setup
 
-- [ ] 4.1 Run `git init`, stage the project (respecting the existing `.gitignore`), and make an initial commit
-- [ ] 4.2 Stop and ask the user to create a GitHub repository named `entropy-minesweeper` via the web UI (no `gh` CLI available), then add it as the `origin` remote once they confirm it exists
-- [ ] 4.3 Push the initial commit to the default branch and verify it appears on GitHub
+- [x] 4.1 Run `git init`, stage the project (respecting the existing `.gitignore`), and make an initial commit
+- [x] 4.2 Stop and ask the user to create a GitHub repository named `entropy-minesweeper` via the web UI (no `gh` CLI available), then add it as the `origin` remote once they confirm it exists
+- [x] 4.3 Push the initial commit to the default branch and verify it appears on GitHub
 
 ## 5. CI/CD workflow
 
