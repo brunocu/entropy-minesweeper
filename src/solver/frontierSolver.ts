@@ -446,31 +446,109 @@ interface FlagGivens {
 
 const NO_FLAG_GIVENS: FlagGivens = { forcedSafe: new Set(), forcedMine: new Set() }
 
+// --- Subset verdict cache (optimize-explanation-extraction D2/D3) ---
+// The oracle's work depends only on the candidate constraint subset and `flagGivens`, never on
+// which cell is asking - so cache each distinct subset's *full* forced-status result and let any
+// later query (from this cell's own grow/trim search or a different cell's) read its answer off it.
+
+interface SubsetVerdict {
+  readonly forcedMine: ReadonlySet<string>
+  readonly forcedSafe: ReadonlySet<string>
+}
+
+/**
+ * One subset's cached verdicts, kept as two tiers so the exponential half stays lazy: a query
+ * Tier-0 already answers must never pay for enumeration just to fill the cache for other cells.
+ */
+interface SubsetCacheEntry {
+  /** Tier-0 fixpoint over the subset, seeded with `flagGivens` (design.md Decision 5 step 3). */
+  readonly tier0: SubsetVerdict
+  /** Backtracking-derived verdict (unseeded, per Decision 5); computed on first demand only. */
+  enumerated?: SubsetVerdict
+}
+
+type SubsetVerdictCache = Map<string, SubsetCacheEntry>
+
+/**
+ * Canonical signature of a candidate subset plus the givens it is resolved under - the same style
+ * as `componentSignature`, one level finer (per candidate subset within a component). Equal
+ * signature guarantees equal verdict, since this is exactly what the deduction is a function of.
+ */
+function subsetSignature(constraints: readonly RawConstraint[], flagGivens: FlagGivens): string {
+  const constraintPart = constraints
+    .map((c) => `${c.key}:${c.requiredMines}:${[...c.cells].sort().join(',')}`)
+    .sort()
+    .join(';')
+  const minePart = [...flagGivens.forcedMine].sort().join(',')
+  const safePart = [...flagGivens.forcedSafe].sort().join(',')
+  return `${constraintPart}|mine=${minePart}|safe=${safePart}`
+}
+
+/**
+ * The subset's Tier-0 verdict, memoized per subset. `growTrimCallCount` increments here and only
+ * here: a miss is exactly one genuine (re)computation of a grow/trim search step.
+ */
+function resolveSubset(
+  cache: SubsetVerdictCache,
+  constraints: readonly RawConstraint[],
+  flagGivens: FlagGivens,
+): SubsetCacheEntry {
+  const signature = subsetSignature(constraints, flagGivens)
+  const cached = cache.get(signature)
+  if (cached) return cached
+
+  growTrimCallCount++
+  const { forcedSafe, forcedMine } = applyTrivialDeduction(constraints, flagGivens.forcedSafe, flagGivens.forcedMine)
+  const entry: SubsetCacheEntry = { tier0: { forcedMine, forcedSafe } }
+  cache.set(signature, entry)
+  return entry
+}
+
+/**
+ * The subset's backtracking verdict, derived for *every* cell in the subset at once from
+ * assignment agreement - that is what lets a later query about a different cell be a cache hit.
+ */
+function resolveSubsetByEnumeration(entry: SubsetCacheEntry, constraints: readonly RawConstraint[]): SubsetVerdict {
+  if (entry.enumerated) return entry.enumerated
+
+  const componentCells = [...new Set(constraints.flatMap((c) => c.cells))]
+  const assignments = enumerateComponent(componentCells, constraints)
+  const forcedMine = new Set<string>()
+  const forcedSafe = new Set<string>()
+  if (assignments.length > 0) {
+    for (const cellKey of componentCells) {
+      if (assignments.every((a) => a.assignment.get(cellKey) === 1)) forcedMine.add(cellKey)
+      else if (assignments.every((a) => a.assignment.get(cellKey) === 0)) forcedSafe.add(cellKey)
+    }
+  }
+  entry.enumerated = { forcedMine, forcedSafe }
+  return entry.enumerated
+}
+
+function verdictHas(verdict: SubsetVerdict, xKey: string, targetValue: 0 | 1): boolean {
+  return targetValue === 1 ? verdict.forcedMine.has(xKey) : verdict.forcedSafe.has(xKey)
+}
+
 /**
  * Whether `constraints` alone force `xKey` to `targetValue`, via Tier-0 first (seeded with
  * `flagGivens`, design.md Decision 5 step 3), exact backtracking as fallback (unseeded -
  * the flag shortcut only applies to the Tier-0 pass, per Decision 5).
  */
 function resolvesTo(
+  cache: SubsetVerdictCache,
   constraints: readonly RawConstraint[],
   xKey: string,
   targetValue: 0 | 1,
   flagGivens: FlagGivens = NO_FLAG_GIVENS,
 ): boolean {
-  growTrimCallCount++
-  const { forcedSafe, forcedMine } = applyTrivialDeduction(constraints, flagGivens.forcedSafe, flagGivens.forcedMine)
-  if (targetValue === 1 && forcedMine.has(xKey)) return true
-  if (targetValue === 0 && forcedSafe.has(xKey)) return true
-
-  const componentCells = [...new Set(constraints.flatMap((c) => c.cells))]
-  if (!componentCells.includes(xKey)) return false
-  const assignments = enumerateComponent(componentCells, constraints)
-  if (assignments.length === 0) return false
-  return assignments.every((a) => a.assignment.get(xKey) === targetValue)
+  const entry = resolveSubset(cache, constraints, flagGivens)
+  if (verdictHas(entry.tier0, xKey, targetValue)) return true
+  return verdictHas(resolveSubsetByEnumeration(entry, constraints), xKey, targetValue)
 }
 
 /** 2.1 Grow phase: add BFS layers one at a time until the accumulated set resolves `xKey`. */
 function growSufficientSet(
+  cache: SubsetVerdictCache,
   xKey: string,
   targetValue: 0 | 1,
   layers: readonly RawConstraint[][],
@@ -479,25 +557,36 @@ function growSufficientSet(
   let candidate: RawConstraint[] = []
   for (const layer of layers) {
     candidate = [...candidate, ...layer]
-    if (resolvesTo(candidate, xKey, targetValue, flagGivens)) return candidate
+    if (resolvesTo(cache, candidate, xKey, targetValue, flagGivens)) return candidate
   }
   return candidate
 }
 
-/** 2.2 Trim phase: deletion-based minimization in a fixed order (grow order), dropping redundant members. */
-function trimToMinimal(
-  candidate: readonly RawConstraint[],
+/**
+ * 2.2 Trim phase: QuickXplain's divide-and-conquer minimization (Junker 2004), adapted to our
+ * "sufficiency" polarity - `resolvesTo(S)` is monotone, since a superset of a sufficient set can
+ * only ever gain information. Returns an irreducible subset of `candidates` that, together with
+ * `background`, still resolves `xKey`; when nothing suffices, every element comes back (matching
+ * the linear deletion scan this replaces). See optimize-explanation-extraction design.md D1.
+ */
+function quickXplain(
+  cache: SubsetVerdictCache,
+  background: readonly RawConstraint[],
+  candidates: readonly RawConstraint[],
   xKey: string,
   targetValue: 0 | 1,
   flagGivens: FlagGivens = NO_FLAG_GIVENS,
 ): RawConstraint[] {
-  let current = [...candidate]
-  for (const c of candidate) {
-    if (!current.some((cc) => cc.key === c.key)) continue
-    const without = current.filter((cc) => cc.key !== c.key)
-    if (resolvesTo(without, xKey, targetValue, flagGivens)) current = without
-  }
-  return current
+  if (candidates.length === 0) return []
+  if (resolvesTo(cache, background, xKey, targetValue, flagGivens)) return []
+  if (candidates.length === 1) return [...candidates]
+
+  const mid = Math.ceil(candidates.length / 2)
+  const first = candidates.slice(0, mid)
+  const second = candidates.slice(mid)
+  const delta2 = quickXplain(cache, [...background, ...first], second, xKey, targetValue, flagGivens)
+  const delta1 = quickXplain(cache, [...background, ...delta2], first, xKey, targetValue, flagGivens)
+  return [...delta1, ...delta2]
 }
 
 function parseKey(k: string): Coord {
@@ -531,11 +620,14 @@ export function computeComponentForcedSets(
 
 /** 2.3 Premise cells: unrevealed cells whose own forced status the trimmed set relies on, excluding `xKey` itself. */
 function extractPremiseKeys(
+  cache: SubsetVerdictCache,
   trimmed: readonly RawConstraint[],
   xKey: string,
   flagGivens: FlagGivens = NO_FLAG_GIVENS,
 ): string[] {
-  const { forcedSafe, forcedMine } = applyTrivialDeduction(trimmed, flagGivens.forcedSafe, flagGivens.forcedMine)
+  // D4: `trimmed` is the subset `quickXplain` just worked over, so this is normally a cache hit -
+  // a map lookup in place of a second full Tier-0 fixpoint pass.
+  const { forcedSafe, forcedMine } = resolveSubset(cache, trimmed, flagGivens).tier0
   // A flag-seeded fact is only a genuine premise of this explanation when it's actually a
   // neighbor referenced by one of S's own constraints - otherwise seeding could surface an
   // unrelated (if real) forced cell from elsewhere in the component. See design.md Decision 4.
@@ -550,15 +642,16 @@ interface CellExplanation {
 
 /** Runs the grow-then-trim search (2.1-2.3) for a single certain frontier cell. */
 function computeExplanationForCell(
+  cache: SubsetVerdictCache,
   xKey: string,
   targetValue: 0 | 1,
   constraints: readonly RawConstraint[],
   flagGivens: FlagGivens = NO_FLAG_GIVENS,
 ): CellExplanation {
   const layers = computeBfsLayers(xKey, constraints)
-  const grown = growSufficientSet(xKey, targetValue, layers, flagGivens)
-  const trimmed = trimToMinimal(grown, xKey, targetValue, flagGivens)
-  const premiseKeys = extractPremiseKeys(trimmed, xKey, flagGivens)
+  const grown = growSufficientSet(cache, xKey, targetValue, layers, flagGivens)
+  const trimmed = quickXplain(cache, [], grown, xKey, targetValue, flagGivens)
+  const premiseKeys = extractPremiseKeys(cache, trimmed, xKey, flagGivens)
   return { clueKeys: trimmed.map((c) => c.key), premiseKeys }
 }
 
@@ -607,6 +700,11 @@ export function computeExplanations(
   const components = computeComponents(frontierKeys, constraints)
   const newCache = new Map<string, ComponentCacheEntry>()
   const result = new Map<string, FrontierExplanation>()
+  // optimize-explanation-extraction D2: one subset-verdict cache for this whole call, shared by
+  // every certain cell's grow/trim/premise queries across all components. Deliberately a plain
+  // mutable local rather than the immutable threading `ComponentCache` uses - it never crosses a
+  // public boundary and is discarded when this call returns.
+  const subsetCache: SubsetVerdictCache = new Map()
 
   for (const cells of components.values()) {
     const cellSet = new Set(cells)
@@ -633,7 +731,13 @@ export function computeExplanations(
         const f = certainByKey.get(xKey)
         if (!f) continue
         const targetValue: 0 | 1 = f.probability === 1 ? 1 : 0
-        const { clueKeys, premiseKeys } = computeExplanationForCell(xKey, targetValue, constraints, flagGivens)
+        const { clueKeys, premiseKeys } = computeExplanationForCell(
+          subsetCache,
+          xKey,
+          targetValue,
+          constraints,
+          flagGivens,
+        )
         map.set(xKey, {
           row: f.row,
           col: f.col,
@@ -649,6 +753,88 @@ export function computeExplanations(
   }
 
   return { explanations: result, cache: newCache }
+}
+
+// --- Test-only views of the subset-verdict cache and QuickXplain (optimize-explanation-extraction) ---
+// Exposed the same way computeClueBfsLayers/computeComponentForcedSets are: the real internals,
+// addressed by board coordinates, so tests exercise the shipped code rather than a copy of it.
+
+/** Opaque handle to a subset-verdict cache, so a test can share (or not share) one across calls. */
+export type SubsetVerdictCacheHandle = SubsetVerdictCache
+
+export function createSubsetVerdictCacheForTest(): SubsetVerdictCacheHandle {
+  return new Map()
+}
+
+interface FlagGivensInput {
+  readonly forcedMine?: readonly string[]
+  readonly forcedSafe?: readonly string[]
+}
+
+function toFlagGivens(input: FlagGivensInput = {}): FlagGivens {
+  return { forcedMine: new Set(input.forcedMine ?? []), forcedSafe: new Set(input.forcedSafe ?? []) }
+}
+
+/** The board's constraints for the given clue cells, in the order given. */
+function constraintsForClues(board: SolverBoard, clueCells: readonly Coord[]): RawConstraint[] {
+  const byKey = new Map(buildConstraints(board).map((c) => [c.key, c]))
+  return clueCells.map((c) => byKey.get(key(c.row, c.col))!)
+}
+
+export function computeSubsetSignatureForTest(
+  board: SolverBoard,
+  clueCells: readonly Coord[],
+  flagGivens?: FlagGivensInput,
+): string {
+  return subsetSignature(constraintsForClues(board, clueCells), toFlagGivens(flagGivens))
+}
+
+export function resolveSubsetForTest(
+  cache: SubsetVerdictCacheHandle,
+  board: SolverBoard,
+  clueCells: readonly Coord[],
+  flagGivens?: FlagGivensInput,
+): { forcedMine: Coord[]; forcedSafe: Coord[] } {
+  const { tier0 } = resolveSubset(cache, constraintsForClues(board, clueCells), toFlagGivens(flagGivens))
+  return { forcedMine: [...tier0.forcedMine].map(parseKey), forcedSafe: [...tier0.forcedSafe].map(parseKey) }
+}
+
+export function quickXplainForTest(
+  cache: SubsetVerdictCacheHandle,
+  board: SolverBoard,
+  background: readonly Coord[],
+  candidates: readonly Coord[],
+  x: Coord,
+  targetValue: 0 | 1,
+  flagGivens?: FlagGivensInput,
+): Coord[] {
+  const trimmed = quickXplain(
+    cache,
+    constraintsForClues(board, background),
+    constraintsForClues(board, candidates),
+    key(x.row, x.col),
+    targetValue,
+    toFlagGivens(flagGivens),
+  )
+  return trimmed.map((c) => parseKey(c.key))
+}
+
+/** One certain cell's grow -> QuickXplain -> premise pipeline, against a caller-supplied cache. */
+export function computeCellExplanationForTest(
+  cache: SubsetVerdictCacheHandle,
+  board: SolverBoard,
+  x: Coord,
+  targetValue: 0 | 1,
+  flagGivens?: FlagGivensInput,
+): { clueCells: Coord[]; premiseCells: Coord[] } {
+  const { clueKeys, premiseKeys } = computeExplanationForCell(
+    cache,
+    key(x.row, x.col),
+    targetValue,
+    buildConstraints(board),
+    toFlagGivens(flagGivens),
+  )
+  return { clueCells: clueKeys.map(parseKey), premiseCells: premiseKeys.map(parseKey) }
 }
 
 function cartesianProduct<T>(arrays: readonly T[][]): T[][] {

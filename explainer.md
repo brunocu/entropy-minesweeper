@@ -399,14 +399,14 @@ Hovering a certain cell in the game highlights what survives that trimming: the 
 :::figcaption
 A different board state, with one certainly-safe cell. Read it in two steps.
 <br />
-The `1` at E2 has exactly one unrevealed neighbour, so that neighbour must be
+The `1` at E1 has exactly one unrevealed neighbour, so that neighbour must be
 the mine, the premise.
 <br />
 The other `1` at D2 sees only that premise and the ringed cell, and
 its single mine is already spoken for, so the next cell is safe.
 <br />
 In full: <span data-figure="certainty-focus">C1</span> is certainly safe because of the clues at
-<span class="term-clue" data-figure="certainty-clues">D2 and E2</span>, given that
+<span class="term-clue" data-figure="certainty-clues">E1 and D2</span>, given that
 <span class="term-premise" data-figure="certainty-premises">D1</span>
 must be a mine.
 :::

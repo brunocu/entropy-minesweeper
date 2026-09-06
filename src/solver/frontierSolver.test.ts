@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeCellExplanationForTest,
   computeClueBfsLayers,
   computeComponentForcedSets,
   computeComponentSignature,
   computeExplanations,
   computeFrontierComponents,
+  computeSubsetSignatureForTest,
   computeTrivialDeductions,
+  createSubsetVerdictCacheForTest,
   getEnumerationCallCountForTest,
   getGrowTrimCallCountForTest,
+  quickXplainForTest,
   resetEnumerationCallCountForTest,
   resetGrowTrimCallCountForTest,
+  resolveSubsetForTest,
   solve,
   type SolverBoard,
   type SolverCell,
@@ -542,5 +547,119 @@ describe('batch explanation computation (3.1)', () => {
     expect(explanations.has('0,2')).toBe(true)
     expect(coordSet(explanations.get('0,1')!.clueCells)).toEqual(coordSet([{ row: 0, col: 0 }]))
     expect(coordSet(explanations.get('0,2')!.clueCells)).toEqual(coordSet([{ row: 0, col: 3 }]))
+  })
+})
+
+describe('subset signature (optimize-explanation-extraction 1.1)', () => {
+  const board = makeBoard(['121', '???'], 2)
+  const clueA = { row: 0, col: 0 }
+  const clueB = { row: 0, col: 1 }
+
+  it('is identical for the same constraints in a different order and from a different build', () => {
+    expect(computeSubsetSignatureForTest(board, [clueA, clueB])).toBe(computeSubsetSignatureForTest(board, [clueB, clueA]))
+  })
+
+  it('differs when the givens the subset is resolved under differ', () => {
+    expect(computeSubsetSignatureForTest(board, [clueA, clueB], { forcedMine: ['1,0'] })).not.toBe(
+      computeSubsetSignatureForTest(board, [clueA, clueB]),
+    )
+  })
+})
+
+describe('subset verdict cache (optimize-explanation-extraction 1.2, 1.4)', () => {
+  it('recomputes a subset only on the first query for it', () => {
+    const board = makeBoard(['.1', '.?'], 1)
+    const cache = createSubsetVerdictCacheForTest()
+    const clues = [{ row: 0, col: 1 }]
+
+    resetGrowTrimCallCountForTest()
+    const first = resolveSubsetForTest(cache, board, clues)
+    const second = resolveSubsetForTest(cache, board, clues)
+
+    expect(getGrowTrimCallCountForTest()).toBe(1)
+    expect(coordSet(first.forcedMine)).toEqual(coordSet([{ row: 1, col: 1 }]))
+    expect(second).toEqual(first)
+  })
+
+  it('does less work for cells sharing candidate subsets when they share one cache', () => {
+    // In the 1-2-1 pattern all three frontier cells are certain, and each one's grow/trim search
+    // probes subsets of the same three clues - so a shared cache turns most of the second and
+    // third cells' queries into hits.
+    const board = makeBoard(['121', '???'], 2)
+    const certain = solve(board, new Map()).result.frontier.filter((f) => f.probability === 0 || f.probability === 1)
+    expect(certain.length).toBeGreaterThan(1)
+    const explain = (cacheFor: (f: (typeof certain)[number]) => ReturnType<typeof createSubsetVerdictCacheForTest>): void => {
+      for (const f of certain) {
+        computeCellExplanationForTest(cacheFor(f), board, { row: f.row, col: f.col }, f.probability === 1 ? 1 : 0)
+      }
+    }
+
+    resetGrowTrimCallCountForTest()
+    explain(() => createSubsetVerdictCacheForTest()) // a fresh cache per cell: no cross-cell reuse
+    const isolated = getGrowTrimCallCountForTest()
+
+    const shared = createSubsetVerdictCacheForTest()
+    resetGrowTrimCallCountForTest()
+    explain(() => shared)
+    expect(getGrowTrimCallCountForTest()).toBeLessThan(isolated)
+  })
+})
+
+describe('QuickXplain minimization (optimize-explanation-extraction 2.1)', () => {
+  it('returns a single-element candidate set unchanged', () => {
+    const board = makeBoard(['.1', '.?'], 1)
+    const trimmed = quickXplainForTest(createSubsetVerdictCacheForTest(), board, [], [{ row: 0, col: 1 }], { row: 1, col: 1 }, 1)
+    expect(coordSet(trimmed)).toEqual(coordSet([{ row: 0, col: 1 }]))
+  })
+
+  it('keeps only the genuinely necessary member, dropping redundant ones', () => {
+    // (0,0) alone forces (0,1) to be a mine; (0,3) constrains the other end of the board only.
+    const board = makeBoard(['1??1'], 2)
+    const trimmed = quickXplainForTest(
+      createSubsetVerdictCacheForTest(),
+      board,
+      [],
+      [
+        { row: 0, col: 0 },
+        { row: 0, col: 3 },
+      ],
+      { row: 0, col: 1 },
+      1,
+    )
+    expect(coordSet(trimmed)).toEqual(coordSet([{ row: 0, col: 0 }]))
+  })
+
+  it('returns the empty set when the background alone already resolves the cell', () => {
+    const board = makeBoard(['1??1'], 2)
+    const trimmed = quickXplainForTest(
+      createSubsetVerdictCacheForTest(),
+      board,
+      [{ row: 0, col: 0 }],
+      [{ row: 0, col: 3 }],
+      { row: 0, col: 1 },
+      1,
+    )
+    expect(trimmed).toEqual([])
+  })
+})
+
+describe('premise extraction reuses the trim verdict (optimize-explanation-extraction 3.1)', () => {
+  it('finds the trimmed set already in the cache once QuickXplain has minimized it', () => {
+    const board = makeBoard(['121', '???'], 2)
+    const cache = createSubsetVerdictCacheForTest()
+    const allClues = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ]
+    const trimmed = quickXplainForTest(cache, board, [], allClues, { row: 1, col: 0 }, 1)
+    expect(coordSet(trimmed)).toEqual(coordSet([
+      { row: 0, col: 1 },
+      { row: 0, col: 2 },
+    ]))
+
+    resetGrowTrimCallCountForTest()
+    resolveSubsetForTest(cache, board, trimmed) // what extractPremiseKeys now does instead of its own pass
+    expect(getGrowTrimCallCountForTest()).toBe(0)
   })
 })

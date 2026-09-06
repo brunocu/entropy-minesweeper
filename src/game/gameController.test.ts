@@ -110,8 +110,8 @@ describe('explanation lookup wiring (3.2)', () => {
   it('reflects board state after each reveal, recomputed (not stale) on the next one', () => {
     // Width-1 corridor, mines at rows 2 and 4. Revealing (0,0) cascades into (1,0)="1",
     // which alone forces (2,0) mine. Revealing (3,0) afterwards adds a "2" whose two
-    // neighbors (2,0),(4,0) are both fully forced by it alone - a different, more direct
-    // explanation for (2,0) than the one from move 1, plus a brand-new entry for (4,0).
+    // neighbors (2,0),(4,0) are both fully forced by it alone - so (2,0) now has two
+    // equally minimal one-clue explanations, and (4,0) gets a brand-new entry it had none of.
     const layout = [[false], [false], [true], [false], [true]]
     const controller = new GameController(Board.fromMineLayout(layout))
 
@@ -120,7 +120,9 @@ describe('explanation lookup wiring (3.2)', () => {
     expect(controller.latestExplanations.has('4,0')).toBe(false)
 
     controller.reveal(3, 0)
-    expect(controller.latestExplanations.get('2,0')?.clueCells).toEqual([{ row: 3, col: 0 }])
+    // Which of the two single-clue explanations for (2,0) comes back is a tie the minimizer is
+    // free to break either way; that it stays a one-clue explanation is the spec's actual claim.
+    expect(controller.latestExplanations.get('2,0')?.clueCells).toHaveLength(1)
     expect(controller.latestExplanations.get('4,0')?.clueCells).toEqual([{ row: 3, col: 0 }])
   })
 })

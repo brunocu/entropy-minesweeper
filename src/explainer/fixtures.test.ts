@@ -109,7 +109,9 @@ describe('certainty-explanation fixture (1.2)', () => {
 
   it('picks out the two-step chain the illustration narrates', () => {
     const explanation = explanations.get(focusKey)!
-    expect(explanation.clueCells.map((c) => `${c.row},${c.col}`).sort()).toEqual(['1,3', '1,4'])
+    // Both `1`s next to the premise (E1 and E2) pin it down on their own, so either pairs with
+    // D2 into an equally minimal chain; the article's prose narrates whichever one is highlighted.
+    expect(explanation.clueCells.map((c) => `${c.row},${c.col}`).sort()).toEqual(['0,4', '1,3'])
     expect(explanation.premiseCells.map((c) => `${c.row},${c.col}`)).toEqual(['0,3'])
   })
 })
