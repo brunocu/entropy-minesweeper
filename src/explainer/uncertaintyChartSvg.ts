@@ -62,7 +62,7 @@ export function renderUncertaintyChart(
   parts.push(
     `<line x1="${PAD_LEFT}" y1="${PAD_TOP}" x2="${PAD_LEFT}" y2="${HEIGHT - PAD_BOTTOM}" stroke="${AXIS_COLOR}" stroke-width="1" />`,
     `<line x1="${PAD_LEFT}" y1="${HEIGHT - PAD_BOTTOM}" x2="${WIDTH - PAD_RIGHT}" y2="${HEIGHT - PAD_BOTTOM}" stroke="${AXIS_COLOR}" stroke-width="1" />`,
-    `<text x="${PAD_LEFT + plotWidth / 2}" y="${HEIGHT - 8}" text-anchor="middle" font-size="11" fill="${TEXT_COLOR}">Move index</text>`,
+    `<text x="${PAD_LEFT + plotWidth / 2}" y="${HEIGHT - 8}" text-anchor="middle" font-size="11" fill="${TEXT_COLOR}">Total moves</text>`,
     `<text x="14" y="${PAD_TOP + plotHeight / 2}" text-anchor="middle" font-size="11" fill="${TEXT_COLOR}" ` +
       `transform="rotate(-90 14 ${PAD_TOP + plotHeight / 2})">Bits</text>`,
   )

@@ -116,9 +116,9 @@ export function createRevealDemo(
     elements.predicted.textContent = formatBits(focusResult.eig)
 
     if (drawn === null) {
-      elements.realized.textContent = '—'
+      elements.realized.textContent = '?'
       elements.narration.innerHTML =
-        `Click <strong>${focusLabel}</strong> — the cell ringed in violet. Before you do, the solver already ` +
+        `Click <strong>${focusLabel}</strong>, the cell ringed in violet. Before you do, the solver already ` +
         `knows there are <strong>${Math.round(worldsBefore)}</strong> arrangements of mines consistent with this ` +
         `board, and that revealing ${focusLabel} will cut that number down by ${formatBits(focusResult.eig)} ` +
         `<em>on average</em>. Which particular cut you get is up to the draw.`
@@ -141,7 +141,7 @@ export function createRevealDemo(
       `${focusLabel} came back as <strong>${shownOutcome}</strong>, an outcome with probability ` +
       `${(outcomeProbability * 100).toFixed(1)}%. That answer ruled out every arrangement inconsistent with it, ` +
       `taking the count from <strong>${Math.round(worldsBefore)}</strong> down to ` +
-      `<strong>${Math.round(worldsAfter)}</strong>. The information delivered is the log of that ratio — ` +
+      `<strong>${Math.round(worldsAfter)}</strong>. The information delivered is the log of that ratio: ` +
       `log<sub>2</sub>(${Math.round(worldsBefore)}/${Math.round(worldsAfter)}) = ` +
       `<strong>${formatBits(feedback.revealedInformation)}</strong>, which is ${comparison} of ` +
       `${formatBits(focusResult.eig)}. Re-roll a few times: the realized values scatter, but they average back ` +

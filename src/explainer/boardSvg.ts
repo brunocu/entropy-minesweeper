@@ -62,8 +62,11 @@ export function renderBoardSvg(board: SolverBoard, options: BoardSvgOptions = {}
   const certainSafeEigs = frontier.filter((f) => f.probability === 0).map((f) => f.eig)
   const maxEig = certainSafeEigs.length > 0 ? Math.max(...certainSafeEigs) : null
 
-  const width = board.width * cellSize + margin
-  const height = board.height * cellSize + margin
+  // Margin reserved on all four sides so the grid sits centered in the canvas even though labels
+  // only occupy the left and top gutters - without a matching right/bottom margin the grid itself
+  // (not just the label gutter) reads as skewed right and down once the SVG is centered on the page.
+  const width = board.width * cellSize + margin * 2
+  const height = board.height * cellSize + margin * 2
   const parts: string[] = []
 
   for (let col = 0; col < board.width; col++) {

@@ -302,7 +302,7 @@ export function renderWorldsTree(board: SolverBoard, focusCell: Coord, mode: Wor
     const assignment = tip.path
       .map((v, i) => `${toLabel(model.cellOrder[i].row, model.cellOrder[i].col)}${v === 1 ? '✱' : '·'}`)
       .join(' ')
-    return tip.surviving ? `${assignment}  ${(tip.weight * 100).toFixed(1)}%` : `${assignment} — ruled out`
+    return tip.surviving ? `${assignment}  ${(tip.weight * 100).toFixed(1)}%` : `${assignment}: ruled out`
   }
   const tipX = (tip: (typeof model.tips)[number]): number => MARGIN_LEFT + tip.path.length * COLUMN_WIDTH + 10
 
@@ -373,7 +373,7 @@ export function renderWorldsTree(board: SolverBoard, focusCell: Coord, mode: Wor
     if (!tip.surviving) {
       parts.push(
         `<text class="tip-eliminated" x="${x}" y="${y + 4}" font-size="${TIP_FONT_SIZE}" fill="${ELIMINATED_COLOR}">` +
-          `${escapeXml(assignmentText)} &#8212; ruled out</text>`,
+          `${escapeXml(assignmentText)}: ruled out</text>`,
       )
       return
     }

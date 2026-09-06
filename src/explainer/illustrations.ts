@@ -22,11 +22,11 @@ import { renderWorldsTree } from './worldsTree.ts'
 export const UNCERTAINTY_ANNOTATIONS: readonly ChartAnnotation[] = [
   {
     span: UNCERTAINTY_FLAT_SPAN,
-    label: 'flat stretch — three reveals that confirmed what was already known',
+    label: 'flat stretch: three reveals that confirmed what was already known',
   },
   {
     span: [UNCERTAINTY_CLIFF_MOVE, UNCERTAINTY_CLIFF_MOVE],
-    label: 'cliff — one reveal, most of the board',
+    label: 'cliff: one reveal, most of the board',
   },
 ]
 
@@ -92,7 +92,7 @@ export function buildIllustrationFiles(): IllustrationFile[] {
       renderUnsolvedBoard(
         TRIVIAL_BOARD,
         TRIVIAL_FOCUS_CELL,
-        'A covered board where the 1 at A3 touches exactly one unknown cell, A2, which is ringed',
+        'A covered board where the 1 at A3 is adjacent to exactly one unknown cell, A2, which is ringed',
       ),
     ),
     file(
