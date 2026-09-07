@@ -12,9 +12,13 @@ import {
   CERTAINTY_BOARD,
   CERTAINTY_FOCUS_CELL,
   WORLDS_TREE_BOARD,
-  WORLDS_TREE_CONTRAST_CELL,
   WORLDS_TREE_FOCUS_CELL,
 } from './fixtures.ts'
+
+// The cell whose EIG the prose contrasts with the focus cell's: same probability, strictly
+// less information, because its reading only ever answers one yes-or-no. Only the tests
+// name it, so it lives here rather than in fixtures.ts.
+const WORLDS_TREE_CONTRAST_CELL = { row: 0, col: 0 }
 
 const SHELL = new URL('../../explainer.html', import.meta.url)
 const MARKDOWN = new URL('../../explainer.md', import.meta.url)

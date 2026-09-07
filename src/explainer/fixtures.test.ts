@@ -10,9 +10,13 @@ import {
   UNCERTAINTY_FLAT_SPAN,
   UNCERTAINTY_TRACE,
   WORLDS_TREE_BOARD,
-  WORLDS_TREE_CONTRAST_CELL,
   WORLDS_TREE_FOCUS_CELL,
 } from './fixtures.ts'
+
+// The cell whose EIG the prose contrasts with the focus cell's: same probability, strictly
+// less information, because its reading only ever answers one yes-or-no. Only the tests
+// name it, so it lives here rather than in fixtures.ts.
+const WORLDS_TREE_CONTRAST_CELL = { row: 0, col: 0 }
 
 function frontierAt(result: SolveResult, row: number, col: number) {
   const found = result.frontier.find((f) => f.row === row && f.col === col)

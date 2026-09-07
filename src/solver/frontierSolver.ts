@@ -55,7 +55,7 @@ function neighbors(board: SolverBoard, row: number, col: number): Coord[] {
 }
 
 /** 3.1 Frontier identification: unrevealed cells adjacent to a revealed numbered cell. */
-export function identifyFrontier(board: SolverBoard): Coord[] {
+function identifyFrontier(board: SolverBoard): Coord[] {
   const seen = new Set<string>()
   const result: Coord[] = []
   for (let row = 0; row < board.height; row++) {

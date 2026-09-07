@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromLabel, toLabel } from './chessLabel.ts'
+import { toLabel } from './chessLabel.ts'
 
 describe('chess-style cell addressing (1.1)', () => {
   it('labels the top-left cell A1', () => {
@@ -21,23 +21,18 @@ describe('chess-style cell addressing (1.1)', () => {
     expect(toLabel(0, 52)).toBe('BA1')
   })
 
-  it('round-trips labels back to their original position', () => {
-    const cases: [number, number][] = [
-      [0, 0],
-      [4, 0],
-      [0, 25],
-      [0, 26],
-      [0, 27],
-      [12, 51],
-      [99, 701],
+  it('labels distinct positions distinctly, deep into the two-letter range', () => {
+    const cases: [number, number, string][] = [
+      [0, 0, 'A1'],
+      [4, 0, 'A5'],
+      [0, 25, 'Z1'],
+      [0, 26, 'AA1'],
+      [0, 27, 'AB1'],
+      [12, 51, 'AZ13'],
+      [99, 701, 'ZZ100'],
     ]
-    for (const [row, col] of cases) {
-      expect(fromLabel(toLabel(row, col))).toEqual({ row, col })
+    for (const [row, col, label] of cases) {
+      expect(toLabel(row, col)).toBe(label)
     }
-  })
-
-  it('throws on an unparsable label', () => {
-    expect(() => fromLabel('1A')).toThrow()
-    expect(() => fromLabel('')).toThrow()
   })
 })

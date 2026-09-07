@@ -62,12 +62,6 @@ export const WORLDS_TREE_BOARD: SolverBoard = parseSolverBoard(['?10', '?31', '?
 export const WORLDS_TREE_FOCUS_CELL: Coord = { row: 1, col: 0 }
 
 /**
- * The cell whose EIG is contrasted with the focus cell's in the prose: same probability,
- * strictly less information, because its reading only ever answers one yes-or-no.
- */
-export const WORLDS_TREE_CONTRAST_CELL: Coord = { row: 0, col: 0 }
-
-/**
  * Certainty-explanation scenario (design.md decisions 3 and 6), deliberately distinct from
  * the worlds-tree scenario because it demonstrates a different mechanism.
  *
