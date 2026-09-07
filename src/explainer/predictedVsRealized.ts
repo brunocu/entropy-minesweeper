@@ -5,7 +5,8 @@
 // Nothing here is hand-authored arithmetic: the probabilities come from `solve`, and the
 // comparison comes from `computeRevealFeedback`, exactly as in `main.ts`.
 import { computeRevealFeedback, type RevealFeedback } from '../game/revealFeedback.ts'
-import { solve, type Coord, type SolveResult, type SolverBoard } from '../solver/frontierSolver.ts'
+import { solve } from '../solver/probability.ts'
+import type { Coord, SolveResult, SolverBoard } from '../solver/types.ts'
 
 /** How many worlds a solve leaves standing; total uncertainty is log2 of this by definition. */
 export function worldCount(result: SolveResult): number {

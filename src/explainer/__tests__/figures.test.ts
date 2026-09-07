@@ -6,7 +6,7 @@
 // against a second hand-typed copy.
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { solve } from '../../solver/frontierSolver.ts'
+import { solve } from '../../solver/probability.ts'
 import { compileExplainer, computeFigureValues } from '../compileExplainer.ts'
 import {
   CERTAINTY_BOARD,

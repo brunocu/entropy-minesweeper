@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { quickXplain } from '../frontierSolver.ts'
+import { quickXplain } from '../explanation.ts'
 
 /**
  * Validation of `quickXplain` against the source it implements: Rodler, "Understanding the

@@ -12,7 +12,8 @@ import {
   PREMISE_HIGHLIGHT_COLOR,
   probabilityColor,
 } from '../render/probabilityColor.ts'
-import { solve, type Coord, type SolverBoard } from '../solver/frontierSolver.ts'
+import { solve } from '../solver/probability.ts'
+import type { Coord, SolverBoard } from '../solver/types.ts'
 
 /** Accent for "this is the cell under discussion", matching the EIG scale's violet. */
 const FOCUS_COLOR = '#4a3aa7'

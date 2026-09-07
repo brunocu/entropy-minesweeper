@@ -6,7 +6,7 @@
 // in the DOM) were verified visually in-browser during implementation (5.1, 5.3, 6.1, 6.2,
 // 7.1) - this sandbox has no headless browser to re-run those automatically.
 import { describe, expect, it } from 'vitest'
-import { solve } from '../solver/frontierSolver.ts'
+import { solve } from '../solver/probability.ts'
 import { computeRevealFeedback, findFrontierEig } from '../game/revealFeedback.ts'
 import { MINE_POLE_COLOR, NEUTRAL_MIDPOINT_COLOR, SAFE_POLE_COLOR, probabilityColor } from '../render/probabilityColor.ts'
 import { makeBoard } from './support/makeBoard.ts'

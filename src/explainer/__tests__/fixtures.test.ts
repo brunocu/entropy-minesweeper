@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { toLabel } from '../../board/chessLabel.ts'
-import { computeExplanations, solve, type SolveResult } from '../../solver/frontierSolver.ts'
+import { computeExplanations } from '../../solver/explanation.ts'
+import { solve } from '../../solver/probability.ts'
+import type { SolveResult } from '../../solver/types.ts'
 import {
   CERTAINTY_BOARD,
   CERTAINTY_FOCUS_CELL,

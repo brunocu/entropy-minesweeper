@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { WORLDS_TREE_BOARD } from '../../explainer/fixtures.ts'
-import { enumerateWeightedWorlds, solve } from '../frontierSolver.ts'
+import { enumerateWeightedWorlds, solve } from '../probability.ts'
 
 describe('enumerateWeightedWorlds', () => {
   const worlds = enumerateWeightedWorlds(WORLDS_TREE_BOARD)

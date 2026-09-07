@@ -3,7 +3,9 @@
 // no hover to ask for it. The drawing itself is `boardSvg.ts`; this module's job is to run the
 // real `computeExplanations` against the fixture and turn its answer into that drawing's inputs.
 import { toLabel } from '../board/chessLabel.ts'
-import { computeExplanations, solve, type Coord, type SolverBoard } from '../solver/frontierSolver.ts'
+import { computeExplanations } from '../solver/explanation.ts'
+import { solve } from '../solver/probability.ts'
+import type { Coord, SolverBoard } from '../solver/types.ts'
 import { renderBoardSvg } from './boardSvg.ts'
 
 export function renderCertaintyBoard(board: SolverBoard, focusCell: Coord): string {

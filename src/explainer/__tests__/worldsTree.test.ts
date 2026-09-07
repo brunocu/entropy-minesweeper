@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enumerateWeightedWorlds, solve } from '../../solver/frontierSolver.ts'
+import { enumerateWeightedWorlds, solve } from '../../solver/probability.ts'
 import { WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { buildWorldsTreeModel, renderWorldsTree } from '../worldsTree.ts'
 

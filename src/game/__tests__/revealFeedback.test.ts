@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { solve } from '../../solver/frontierSolver.ts'
+import { solve } from '../../solver/probability.ts'
 import { computeRevealFeedback, findFrontierEig } from '../revealFeedback.ts'
 import { makeBoard } from '../../__tests__/support/makeBoard.ts'
 

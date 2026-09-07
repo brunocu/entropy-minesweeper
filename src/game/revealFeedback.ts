@@ -1,4 +1,4 @@
-import type { SolveResult } from '../solver/frontierSolver.ts'
+import type { SolveResult } from '../solver/types.ts'
 
 export interface RevealFeedback {
   readonly predictedEig: number | null

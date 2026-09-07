@@ -18,7 +18,8 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import { toLabel } from '../board/chessLabel.ts'
-import { computeExplanations, solve } from '../solver/frontierSolver.ts'
+import { computeExplanations } from '../solver/explanation.ts'
+import { solve } from '../solver/probability.ts'
 import { rehypeStripAlertTitle, remarkExplainerDirectives } from './directives.ts'
 import {
   CERTAINTY_BOARD,

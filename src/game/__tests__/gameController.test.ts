@@ -129,7 +129,7 @@ describe('explanation lookup wiring (3.2)', () => {
 })
 
 describe('explanation recompute on flag toggle (9.1-9.3)', () => {
-  // Same deduction chain as frontierSolver.test.ts's flag-aware premise-seeding fixture,
+  // Same deduction chain as explanation.test.ts's flag-aware premise-seeding fixture,
   // adapted to a real, consistent mine layout (width-1 corridor, mines at rows 1 and 5):
   // ClueA=(0,0) forces M1=(1,0) mine on its own; ClueB=(2,0) then needs M1 to force
   // M2=(3,0) safe; ClueC=(4,0) then needs M2 to force X=(5,0) mine. Unflagged, X's

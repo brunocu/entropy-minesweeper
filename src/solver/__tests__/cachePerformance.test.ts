@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { boardFromMineLayout } from '../../__tests__/support/boardFactory.ts'
-import { computeExplanations, solve, type ComponentCache, type SolverBoard } from '../frontierSolver.ts'
+import type { ComponentCache } from '../componentEnumeration.ts'
+import { computeExplanations } from '../explanation.ts'
+import { solve } from '../probability.ts'
+import type { SolverBoard } from '../types.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 

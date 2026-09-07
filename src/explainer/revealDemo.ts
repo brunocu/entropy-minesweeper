@@ -9,7 +9,8 @@
 import { toLabel } from '../board/chessLabel.ts'
 import { BoardRenderer, type RenderBoard, type RenderCell } from '../render/boardRenderer.ts'
 import { pixelToCell } from '../render/hitTest.ts'
-import { solve, type Coord, type SolveResult, type SolverBoard } from '../solver/frontierSolver.ts'
+import { solve } from '../solver/probability.ts'
+import type { Coord, SolveResult, SolverBoard } from '../solver/types.ts'
 import { simulateReveal, worldCount, type SimulatedReveal } from './predictedVsRealized.ts'
 
 const CELL_SIZE = 44

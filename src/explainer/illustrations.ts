@@ -2,7 +2,7 @@
 // Everything here runs at build/dev-server-transform time inside the Vite plugin (design.md
 // decision 2a); nothing in this module is shipped to the browser.
 import { toLabel } from '../board/chessLabel.ts'
-import { type Coord, type SolverBoard } from '../solver/frontierSolver.ts'
+import { type Coord, type SolverBoard } from '../solver/types.ts'
 import { renderBoardSvg } from './boardSvg.ts'
 import { renderCertaintyBoard } from './certaintyBoard.ts'
 import {

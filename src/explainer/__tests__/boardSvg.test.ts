@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toLabel } from '../../board/chessLabel.ts'
-import { solve } from '../../solver/frontierSolver.ts'
+import { solve } from '../../solver/probability.ts'
 import { TRIVIAL_BOARD, TRIVIAL_FOCUS_CELL, WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { renderUnsolvedBoard, renderWorldsTreeRootBoard } from '../illustrations.ts'
 

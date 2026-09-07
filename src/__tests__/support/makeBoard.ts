@@ -1,4 +1,4 @@
-import type { SolverBoard, SolverCell } from '../../solver/frontierSolver.ts'
+import type { SolverBoard, SolverCell } from '../../solver/types.ts'
 
 /**
  * Parses a grid literal into a SolverBoard: `?` is an unrevealed cell, `.` a revealed blank,

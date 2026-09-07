@@ -1,7 +1,8 @@
 // Traces 1:1 to the scenarios in
 // openspec/changes/entropy-minesweeper/specs/frontier-solver/spec.md
 import { describe, expect, it } from 'vitest'
-import { computeFrontierComponents, computeTrivialDeductions, solve } from '../frontierSolver.ts'
+import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import { solve } from '../probability.ts'
 import { makeBoard } from '../../__tests__/support/makeBoard.ts'
 
 function coordSet(coords: readonly { row: number; col: number }[]): Set<string> {

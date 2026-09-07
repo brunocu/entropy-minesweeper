@@ -1,21 +1,18 @@
 import { describe, it } from 'vitest'
 import { Board } from '../../board/board.ts'
+import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import type { ComponentCache } from '../componentEnumeration.ts'
+import { computeExplanations } from '../explanation.ts'
 import {
-  computeExplanations,
-  computeFrontierComponents,
-  computeTrivialDeductions,
-  enumerateWeightedWorlds,
   getEnumerationCallCountForTest,
   getGrowTrimCallCountForTest,
   getSubsetKeyCallCountForTest,
   resetEnumerationCallCountForTest,
   resetGrowTrimCallCountForTest,
   resetSubsetKeyCallCountForTest,
-  solve,
-  type ComponentCache,
-  type SolveResult,
-  type SolverBoard,
-} from '../frontierSolver.ts'
+} from '../instrumentation.ts'
+import { enumerateWeightedWorlds, solve } from '../probability.ts'
+import type { SolveResult, SolverBoard } from '../types.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 

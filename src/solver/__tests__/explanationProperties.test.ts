@@ -1,16 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { Board } from '../../board/board.ts'
+import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import { computeExplanations, type FrontierExplanation } from '../explanation.ts'
+import { solve } from '../probability.ts'
+import type { Coord, SolverBoard } from '../types.ts'
 import {
   computeClueBfsLayers,
   computeClueBfsLayersForComponent,
-  computeExplanations,
-  computeFrontierComponents,
-  computeTrivialDeductions,
-  solve,
-  type Coord,
-  type FrontierExplanation,
-  type SolverBoard,
-} from '../frontierSolver.ts'
+} from '../../__tests__/support/solverExplanation.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 import { makeBoard } from '../../__tests__/support/makeBoard.ts'

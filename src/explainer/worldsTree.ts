@@ -12,14 +12,8 @@
 // consistent - so the drawing shows the search that actually runs.
 import { toLabel } from '../board/chessLabel.ts'
 import { EIG_HIGH_COLOR, MINE_POLE_COLOR, SAFE_POLE_COLOR } from '../render/probabilityColor.ts'
-import {
-  enumerateWeightedWorlds,
-  outcomeKey,
-  solve,
-  type Coord,
-  type SolverBoard,
-  type WeightedWorld,
-} from '../solver/frontierSolver.ts'
+import { enumerateWeightedWorlds, outcomeKey, solve, type WeightedWorld } from '../solver/probability.ts'
+import type { Coord, SolverBoard } from '../solver/types.ts'
 
 export type WorldsTreeMode = 'probability' | 'eig'
 

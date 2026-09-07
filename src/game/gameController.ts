@@ -1,12 +1,8 @@
 import { Board } from '../board/board.ts'
-import {
-  computeExplanations,
-  solve,
-  type ComponentCache,
-  type FrontierExplanation,
-  type SolveResult,
-  type SolveWithCache,
-} from '../solver/frontierSolver.ts'
+import type { ComponentCache } from '../solver/componentEnumeration.ts'
+import { computeExplanations, type FrontierExplanation } from '../solver/explanation.ts'
+import { solve, type SolveWithCache } from '../solver/probability.ts'
+import type { SolveResult } from '../solver/types.ts'
 
 function flaggedCellKeys(board: Board): Set<string> {
   const result = new Set<string>()

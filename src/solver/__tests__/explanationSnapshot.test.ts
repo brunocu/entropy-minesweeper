@@ -1,15 +1,11 @@
 import { writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { Board } from '../../board/board.ts'
-import {
-  computeExplanations,
-  computeFrontierComponents,
-  computeTrivialDeductions,
-  solve,
-  type ComponentCache,
-  type SolveResult,
-  type SolverBoard,
-} from '../frontierSolver.ts'
+import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import type { ComponentCache } from '../componentEnumeration.ts'
+import { computeExplanations } from '../explanation.ts'
+import { solve } from '../probability.ts'
+import type { SolveResult, SolverBoard } from '../types.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 

@@ -5,7 +5,7 @@
 //
 // Determinism is the point - "watch this specific deduction happen" only works if the
 // scenario never changes. No random generation anywhere in this module.
-import type { Coord, SolverBoard } from '../solver/frontierSolver.ts'
+import type { Coord, SolverBoard } from '../solver/types.ts'
 import type { UncertaintyHistoryPoint } from '../render/uncertaintyChart.ts'
 
 /**
