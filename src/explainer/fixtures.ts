@@ -13,7 +13,7 @@ import type { UncertaintyHistoryPoint } from '../render/uncertaintyChart.ts'
  * a revealed cell showing that adjacent-mine count. Keeps the fixtures below readable as
  * pictures of the board rather than as nested object literals.
  */
-export function parseSolverBoard(rows: readonly string[], mineCount: number): SolverBoard {
+function parseSolverBoard(rows: readonly string[], mineCount: number): SolverBoard {
   const cells = rows.map((row) =>
     [...row].map((char) =>
       char === '?' ? { revealed: false, adjacentMines: 0 } : { revealed: true, adjacentMines: Number(char) },

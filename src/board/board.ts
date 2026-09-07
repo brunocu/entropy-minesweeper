@@ -19,7 +19,11 @@ export class Board {
   status: GameStatus = 'pending'
   private minesPlaced = false
 
-  constructor(width: number, height: number, mineCount: number) {
+  /**
+   * When `layout` is given, those mines are placed immediately and the first reveal will not
+   * relocate them; otherwise mines are placed on the first reveal, avoiding the clicked cell.
+   */
+  constructor(width: number, height: number, mineCount: number, layout?: boolean[][]) {
     if (width <= 0 || height <= 0) throw new Error('Board dimensions must be positive')
     if (mineCount < 0 || mineCount >= width * height) {
       throw new Error('mineCount must be between 0 and width*height - 1')
@@ -30,23 +34,15 @@ export class Board {
     this.cells = Array.from({ length: height }, () =>
       Array.from({ length: width }, () => createEmptyCell()),
     )
-  }
-
-  /** Test/debug helper: builds a board with a fixed mine layout, mines already placed. */
-  static fromMineLayout(layout: boolean[][]): Board {
-    const height = layout.length
-    const width = layout[0]?.length ?? 0
-    const mineCount = layout.flat().filter(Boolean).length
-    const board = new Board(width, height, mineCount)
-    for (let row = 0; row < height; row++) {
-      for (let col = 0; col < width; col++) {
-        board.cells[row][col].isMine = layout[row][col]
+    if (layout) {
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          this.cells[row][col].isMine = layout[row][col]
+        }
       }
+      this.computeAdjacentCounts()
+      this.minesPlaced = true
     }
-    board.computeAdjacentCounts()
-    board.minesPlaced = true
-    board.status = 'playing'
-    return board
   }
 
   private inBounds(row: number, col: number): boolean {
