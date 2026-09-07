@@ -270,6 +270,20 @@ export function getGrowTrimCallCountForTest(): number {
 }
 
 /**
+ * `subsetKeyCallCount` counts subset-key builds, *including* the ones that go on to hit the
+ * subset-verdict cache - which is exactly what `growTrimCallCount` (misses only) cannot show.
+ * Sizing that gap is what tells us whether the per-query key build is worth optimizing
+ * (reduce-explanation-setup-overhead design D6).
+ */
+let subsetKeyCallCount = 0
+export function resetSubsetKeyCallCountForTest(): void {
+  subsetKeyCallCount = 0
+}
+export function getSubsetKeyCallCountForTest(): number {
+  return subsetKeyCallCount
+}
+
+/**
  * 3.4 Per-component exact backtracking enumeration, with Tier 0 pre-applied. Also exposes
  * the component's real (untrimmed) forced-mine/forced-safe sets (design.md Decision 5, step 1)
  * instead of discarding them, so they can be intersected with flagged cells elsewhere.
@@ -382,29 +396,85 @@ export function computeComponentSignature(
 // ("grow") search followed by deletion-based ("trim") minimization - see design.md
 // decisions 1-4 of openspec/changes/frontier-certainty-explanation.
 
-/** 1.1 Clue-adjacency: two constraints are adjacent when they share a frontier cell. */
-function buildClueAdjacency(constraints: readonly RawConstraint[]): Map<string, string[]> {
-  const byCell = new Map<string, string[]>()
+/**
+ * 1.1/1.2 Everything the per-certain-cell search needs from the component it is explaining, built
+ * once per component per `computeExplanations` call instead of once per certain cell.
+ *
+ * Handing the pipeline `constraints` - this component's clues, not the whole board's - is what
+ * makes `frontier-solver`'s "explanation is drawn from that cell's frontier-component" scoping
+ * structural: the clues that must not appear are not in scope to appear. It is also
+ * layer-identical to passing the whole board, since every constraint's cells lie wholly inside
+ * one component, so a BFS over the "clues share a frontier cell" relation can never leave it.
+ * See reduce-explanation-setup-overhead design.md D1/D2.
+ */
+interface ComponentIndex {
+  /** This component's clues. */
+  readonly constraints: readonly RawConstraint[]
+  /** cellKey -> the clues referencing it. The on-demand replacement for a materialized adjacency. */
+  readonly cluesByCell: Map<string, string[]>
+  readonly constraintByKey: Map<string, RawConstraint>
+  /** Dense id per clue, assigned in `constraints` order. The subset-key alphabet (D4). */
+  readonly idByClueKey: Map<string, number>
+  readonly flagGivens: FlagGivens
+  /** `flagGivens` serialized once, prefixed onto every subset key in this component (D4). */
+  readonly givensPrefix: string
+  /** This component's subset-verdict cache (D5). */
+  readonly cache: SubsetVerdictCache
+}
+
+/**
+ * D5: the cache is a parameter so a test can share one across calls, but it belongs to the index
+ * rather than to the caller - a cache reached through the index cannot be handed a subset from
+ * another component by accident, which is what makes `flagGivens` constant within it and so
+ * hoistable into `givensPrefix`.
+ */
+function buildComponentIndex(
+  constraints: readonly RawConstraint[],
+  flagGivens: FlagGivens,
+  cache: SubsetVerdictCache = new Map(),
+): ComponentIndex {
+  const cluesByCell = new Map<string, string[]>()
+  const constraintByKey = new Map<string, RawConstraint>()
+  const idByClueKey = new Map<string, number>()
   for (const c of constraints) {
+    constraintByKey.set(c.key, c)
+    idByClueKey.set(c.key, idByClueKey.size)
     for (const cellKey of c.cells) {
-      const arr = byCell.get(cellKey)
+      const arr = cluesByCell.get(cellKey)
       if (arr) arr.push(c.key)
-      else byCell.set(cellKey, [c.key])
+      else cluesByCell.set(cellKey, [c.key])
     }
   }
-  const adjacency = new Map<string, Set<string>>()
-  for (const c of constraints) adjacency.set(c.key, new Set())
-  for (const clueKeys of byCell.values()) {
-    for (let i = 0; i < clueKeys.length; i++) {
-      for (let j = i + 1; j < clueKeys.length; j++) {
-        adjacency.get(clueKeys[i])!.add(clueKeys[j])
-        adjacency.get(clueKeys[j])!.add(clueKeys[i])
+  const minePart = [...flagGivens.forcedMine].sort().join(',')
+  const safePart = [...flagGivens.forcedSafe].sort().join(',')
+  return {
+    constraints,
+    cluesByCell,
+    constraintByKey,
+    idByClueKey,
+    flagGivens,
+    givensPrefix: `mine=${minePart}|safe=${safePart}`,
+    cache,
+  }
+}
+
+/**
+ * The clues sharing a frontier cell with `clue`, derived from `cluesByCell` on demand. D2: only
+ * the clues a walk actually reaches are ever expanded, where the adjacency map this replaces paid
+ * an `O(sum of deg^2)` pairwise closure over the whole component whether it was consumed or not.
+ */
+function neighboursOf(index: ComponentIndex, clue: RawConstraint): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const cellKey of clue.cells) {
+    for (const neighbour of index.cluesByCell.get(cellKey) ?? []) {
+      if (neighbour !== clue.key && !seen.has(neighbour)) {
+        seen.add(neighbour)
+        out.push(neighbour)
       }
     }
   }
-  const result = new Map<string, string[]>()
-  for (const [k, v] of adjacency) result.set(k, [...v])
-  return result
+  return out
 }
 
 /**
@@ -412,30 +482,30 @@ function buildClueAdjacency(constraints: readonly RawConstraint[]): Map<string, 
  * constraint touching the cell directly, layer 2 shares a frontier cell with layer 1, etc.
  * Same-distance constraints land in one layer (sorted by key for determinism), never
  * split by a per-cell tie-break.
+ *
+ * Yields one layer per pull rather than walking the component to exhaustion, because
+ * `growSufficientSet` stops as soon as the accumulated set resolves the cell - typically at layer
+ * 1 or 2 - and every layer built past that was thrown away. Abandoning the generator mid-walk
+ * leaves the rest of the component unexpanded. Seeding, the same-distance-one-layer rule, and the
+ * per-layer sort are preserved verbatim, which is what keeps layer contents (and so grow order,
+ * QuickXplain's split order, and the final explanation) identical. See D3.
  */
-function computeBfsLayers(xKey: string, constraints: readonly RawConstraint[]): RawConstraint[][] {
-  const adjacency = buildClueAdjacency(constraints)
-  const byKey = new Map(constraints.map((c) => [c.key, c]))
+function* walkClueLayers(index: ComponentIndex, xKey: string): Generator<RawConstraint[]> {
   const visited = new Set<string>()
-  const layers: RawConstraint[][] = []
-
-  let layerKeys = constraints.filter((c) => c.cells.includes(xKey)).map((c) => c.key)
-  layerKeys = [...new Set(layerKeys)].sort()
+  let layerKeys = [...new Set(index.constraints.filter((c) => c.cells.includes(xKey)).map((c) => c.key))].sort()
 
   while (layerKeys.length > 0) {
     for (const k of layerKeys) visited.add(k)
-    layers.push(layerKeys.map((k) => byKey.get(k)!))
+    yield layerKeys.map((k) => index.constraintByKey.get(k)!)
 
     const next = new Set<string>()
     for (const k of layerKeys) {
-      for (const neighborKey of adjacency.get(k) ?? []) {
-        if (!visited.has(neighborKey)) next.add(neighborKey)
+      for (const neighbourKey of neighboursOf(index, index.constraintByKey.get(k)!)) {
+        if (!visited.has(neighbourKey)) next.add(neighbourKey)
       }
     }
     layerKeys = [...next].sort()
   }
-
-  return layers
 }
 
 /** design.md Decision 5: a component's flagged cells that are also independently, globally forced. */
@@ -470,37 +540,37 @@ interface SubsetCacheEntry {
 type SubsetVerdictCache = Map<string, SubsetCacheEntry>
 
 /**
- * Canonical signature of a candidate subset plus the givens it is resolved under - the same style
- * as `componentSignature`, one level finer (per candidate subset within a component). Equal
- * signature guarantees equal verdict, since this is exactly what the deduction is a function of.
+ * Canonical key of a candidate subset within its component: its clues' ids, sorted, behind the
+ * component's once-serialized givens prefix. Equal key guarantees equal verdict, since within one
+ * `computeExplanations` call `buildConstraints` emits at most one constraint per numbered cell -
+ * so a clue's id pins down its `key`, `cells`, and `requiredMines` completely, and re-hashing that
+ * content per query would only re-derive what the id already fixes. See D4.
  */
-function subsetSignature(constraints: readonly RawConstraint[], flagGivens: FlagGivens): string {
-  const constraintPart = constraints
-    .map((c) => `${c.key}:${c.requiredMines}:${[...c.cells].sort().join(',')}`)
-    .sort()
-    .join(';')
-  const minePart = [...flagGivens.forcedMine].sort().join(',')
-  const safePart = [...flagGivens.forcedSafe].sort().join(',')
-  return `${constraintPart}|mine=${minePart}|safe=${safePart}`
+function subsetKey(index: ComponentIndex, constraints: readonly RawConstraint[]): string {
+  subsetKeyCallCount++
+  const ids = constraints.map((c) => index.idByClueKey.get(c.key)!)
+  ids.sort((a, b) => a - b)
+  return `${index.givensPrefix}|${ids.join(',')}`
 }
 
 /**
- * The subset's Tier-0 verdict, memoized per subset. `growTrimCallCount` increments here and only
- * here: a miss is exactly one genuine (re)computation of a grow/trim search step.
+ * The subset's Tier-0 verdict, memoized per subset in the component's own cache (D5).
+ * `growTrimCallCount` increments here and only here: a miss is exactly one genuine
+ * (re)computation of a grow/trim search step.
  */
-function resolveSubset(
-  cache: SubsetVerdictCache,
-  constraints: readonly RawConstraint[],
-  flagGivens: FlagGivens,
-): SubsetCacheEntry {
-  const signature = subsetSignature(constraints, flagGivens)
-  const cached = cache.get(signature)
+function resolveSubset(index: ComponentIndex, constraints: readonly RawConstraint[]): SubsetCacheEntry {
+  const cacheKey = subsetKey(index, constraints)
+  const cached = index.cache.get(cacheKey)
   if (cached) return cached
 
   growTrimCallCount++
-  const { forcedSafe, forcedMine } = applyTrivialDeduction(constraints, flagGivens.forcedSafe, flagGivens.forcedMine)
+  const { forcedSafe, forcedMine } = applyTrivialDeduction(
+    constraints,
+    index.flagGivens.forcedSafe,
+    index.flagGivens.forcedMine,
+  )
   const entry: SubsetCacheEntry = { tier0: { forcedMine, forcedSafe } }
-  cache.set(signature, entry)
+  index.cache.set(cacheKey, entry)
   return entry
 }
 
@@ -535,57 +605,69 @@ function verdictHas(verdict: SubsetVerdict, xKey: string, targetValue: 0 | 1): b
  * the flag shortcut only applies to the Tier-0 pass, per Decision 5).
  */
 function resolvesTo(
-  cache: SubsetVerdictCache,
+  index: ComponentIndex,
   constraints: readonly RawConstraint[],
   xKey: string,
   targetValue: 0 | 1,
-  flagGivens: FlagGivens = NO_FLAG_GIVENS,
 ): boolean {
-  const entry = resolveSubset(cache, constraints, flagGivens)
+  const entry = resolveSubset(index, constraints)
   if (verdictHas(entry.tier0, xKey, targetValue)) return true
   return verdictHas(resolveSubsetByEnumeration(entry, constraints), xKey, targetValue)
 }
 
-/** 2.1 Grow phase: add BFS layers one at a time until the accumulated set resolves `xKey`. */
+/**
+ * 2.1 Grow phase: add BFS layers one at a time until the accumulated set resolves `xKey`.
+ *
+ * Returns `null` when the layers drain without ever resolving it - QuickXplain's "no p-set" case
+ * (Junker 2004, Alg. 1 line 1), which here means the cell is certain for a reason outside its
+ * component's clues, namely the board's global mine budget. Draining the layers is exactly the
+ * `p(A u B) = 0` test that case is defined by, since the last candidate is the whole component.
+ */
 function growSufficientSet(
-  cache: SubsetVerdictCache,
+  index: ComponentIndex,
   xKey: string,
   targetValue: 0 | 1,
-  layers: readonly RawConstraint[][],
-  flagGivens: FlagGivens = NO_FLAG_GIVENS,
-): RawConstraint[] {
+  layers: Iterable<readonly RawConstraint[]>,
+): RawConstraint[] | null {
   let candidate: RawConstraint[] = []
   for (const layer of layers) {
     candidate = [...candidate, ...layer]
-    if (resolvesTo(cache, candidate, xKey, targetValue, flagGivens)) return candidate
+    if (resolvesTo(index, candidate, xKey, targetValue)) return candidate
   }
-  return candidate
+  return null
 }
 
 /**
- * 2.2 Trim phase: QuickXplain's divide-and-conquer minimization (Junker 2004), adapted to our
- * "sufficiency" polarity - `resolvesTo(S)` is monotone, since a superset of a sufficient set can
- * only ever gain information. Returns an irreducible subset of `candidates` that, together with
- * `background`, still resolves `xKey`; when nothing suffices, every element comes back (matching
- * the linear deletion scan this replaces). See optimize-explanation-extraction design.md D1.
+ * 2.2 Trim phase: QuickXplain's divide-and-conquer minimization - procedure QX' of Alg. 1 in
+ * Rodler, "Understanding the QuickXPlain Algorithm" (arXiv:2001.01835), itself Junker 2004.
+ * Adapted to our "sufficiency" polarity: `p(S)` = "S forces the cell", which is the monotone
+ * property the proof requires, since a superset of a sufficient set can only ever gain information.
+ *
+ * Returns an irreducible subset of `candidates` that, together with `background`, still satisfies
+ * `p`. Callers must only pass a `candidates` set already known sufficient - `growSufficientSet`
+ * returning non-`null` is that guarantee - since the paper places the `p(A u B) = 0` check in QX,
+ * above QX', and QX' has no way to signal it. See optimize-explanation-extraction design.md D1.
+ *
+ * `p` is a parameter, not a closed-over `resolvesTo` call, for the reason the paper gives for its
+ * own formulation (Sec. 1, criterion (i)): the predicate is a black box taking a subset and
+ * returning a bit, nothing more. That keeps the algorithm free of anything minesweeper-specific
+ * and lets `quickXplainPaper.test.ts` drive this exact function with the paper's own worked
+ * example instead of a re-implementation of it.
  */
-function quickXplain(
-  cache: SubsetVerdictCache,
-  background: readonly RawConstraint[],
-  candidates: readonly RawConstraint[],
-  xKey: string,
-  targetValue: 0 | 1,
-  flagGivens: FlagGivens = NO_FLAG_GIVENS,
-): RawConstraint[] {
+export function quickXplain<T>(
+  p: (subset: readonly T[]) => boolean,
+  background: readonly T[],
+  candidates: readonly T[],
+): T[] {
   if (candidates.length === 0) return []
-  if (resolvesTo(cache, background, xKey, targetValue, flagGivens)) return []
+  if (p(background)) return []
   if (candidates.length === 1) return [...candidates]
 
   const mid = Math.ceil(candidates.length / 2)
   const first = candidates.slice(0, mid)
   const second = candidates.slice(mid)
-  const delta2 = quickXplain(cache, [...background, ...first], second, xKey, targetValue, flagGivens)
-  const delta1 = quickXplain(cache, [...background, ...delta2], first, xKey, targetValue, flagGivens)
+  const delta2 = quickXplain(p, [...background, ...first], second)
+  const delta1 = quickXplain(p, [...background, ...delta2], first)
   return [...delta1, ...delta2]
 }
 
@@ -596,8 +678,55 @@ function parseKey(k: string): Coord {
 
 /** Test-only view of 1.1/1.2's BFS clue layering, exposed the same way computeFrontierComponents is. */
 export function computeClueBfsLayers(board: SolverBoard, x: Coord): Coord[][] {
+  const index = buildComponentIndex(buildConstraints(board), NO_FLAG_GIVENS)
+  const layers = [...walkClueLayers(index, key(x.row, x.col))]
+  return layers.map((layer) => layer.map((c) => parseKey(c.key)))
+}
+
+/**
+ * Test-only probe of D3's laziness: how many layers the walker actually yields before
+ * `growSufficientSet` stops pulling. Wraps the real generator in a counting one and runs the real
+ * grow phase, so it measures the shipped path rather than a re-implementation of it.
+ */
+export function countLayersPulledForTest(board: SolverBoard, x: Coord, targetValue: 0 | 1): number {
+  const index = buildComponentIndex(buildConstraints(board), NO_FLAG_GIVENS)
+  const xKey = key(x.row, x.col)
+  let pulled = 0
+  function* counting(): Generator<RawConstraint[]> {
+    for (const layer of walkClueLayers(index, xKey)) {
+      pulled++
+      yield layer
+    }
+  }
+  growSufficientSet(index, xKey, targetValue, counting())
+  return pulled
+}
+
+/**
+ * Test-only view of a `ComponentIndex`'s `cluesByCell` map (reduce-explanation-setup-overhead
+ * D2): the on-demand adjacency's whole substrate, exposed so a hand-checked board can pin it.
+ */
+export function computeCluesByCellForTest(board: SolverBoard): Map<string, Coord[]> {
+  const index = buildComponentIndex(buildConstraints(board), NO_FLAG_GIVENS)
+  return new Map([...index.cluesByCell].map(([cellKey, clueKeys]) => [cellKey, clueKeys.map(parseKey)]))
+}
+
+/**
+ * Test-only view of 1.2's BFS layering restricted to one frontier component's own clues, so a
+ * test can check design D1's claim - that frontier components *are* the connected components of
+ * the clue graph, making the component-scoped walk layer-identical to the whole-board one -
+ * rather than the implementation merely assuming it.
+ */
+export function computeClueBfsLayersForComponent(
+  board: SolverBoard,
+  componentCells: readonly Coord[],
+  x: Coord,
+): Coord[][] {
   const constraints = buildConstraints(board)
-  const layers = computeBfsLayers(key(x.row, x.col), constraints)
+  const cellSet = new Set(componentCells.map((c) => key(c.row, c.col)))
+  const relevantConstraints = constraints.filter((c) => c.cells.some((k) => cellSet.has(k)))
+  const index = buildComponentIndex(relevantConstraints, NO_FLAG_GIVENS)
+  const layers = [...walkClueLayers(index, key(x.row, x.col))]
   return layers.map((layer) => layer.map((c) => parseKey(c.key)))
 }
 
@@ -620,14 +749,13 @@ export function computeComponentForcedSets(
 
 /** 2.3 Premise cells: unrevealed cells whose own forced status the trimmed set relies on, excluding `xKey` itself. */
 function extractPremiseKeys(
-  cache: SubsetVerdictCache,
+  index: ComponentIndex,
   trimmed: readonly RawConstraint[],
   xKey: string,
-  flagGivens: FlagGivens = NO_FLAG_GIVENS,
 ): string[] {
   // D4: `trimmed` is the subset `quickXplain` just worked over, so this is normally a cache hit -
   // a map lookup in place of a second full Tier-0 fixpoint pass.
-  const { forcedSafe, forcedMine } = resolveSubset(cache, trimmed, flagGivens).tier0
+  const { forcedSafe, forcedMine } = resolveSubset(index, trimmed).tier0
   // A flag-seeded fact is only a genuine premise of this explanation when it's actually a
   // neighbor referenced by one of S's own constraints - otherwise seeding could surface an
   // unrelated (if real) forced cell from elsewhere in the component. See design.md Decision 4.
@@ -640,18 +768,17 @@ interface CellExplanation {
   readonly premiseKeys: readonly string[]
 }
 
-/** Runs the grow-then-trim search (2.1-2.3) for a single certain frontier cell. */
-function computeExplanationForCell(
-  cache: SubsetVerdictCache,
-  xKey: string,
-  targetValue: 0 | 1,
-  constraints: readonly RawConstraint[],
-  flagGivens: FlagGivens = NO_FLAG_GIVENS,
-): CellExplanation {
-  const layers = computeBfsLayers(xKey, constraints)
-  const grown = growSufficientSet(cache, xKey, targetValue, layers, flagGivens)
-  const trimmed = quickXplain(cache, [], grown, xKey, targetValue, flagGivens)
-  const premiseKeys = extractPremiseKeys(cache, trimmed, xKey, flagGivens)
+const NO_EXPLANATION: CellExplanation = { clueKeys: [], premiseKeys: [] }
+
+/**
+ * Runs the grow-then-trim search (2.1-2.3) for a single certain frontier cell, reporting the
+ * empty explanation when the component's clues do not force the cell at all.
+ */
+function computeExplanationForCell(index: ComponentIndex, xKey: string, targetValue: 0 | 1): CellExplanation {
+  const grown = growSufficientSet(index, xKey, targetValue, walkClueLayers(index, xKey))
+  if (!grown) return NO_EXPLANATION
+  const trimmed = quickXplain((subset) => resolvesTo(index, subset, xKey, targetValue), [], grown)
+  const premiseKeys = extractPremiseKeys(index, trimmed, xKey)
   return { clueKeys: trimmed.map((c) => c.key), premiseKeys }
 }
 
@@ -700,11 +827,6 @@ export function computeExplanations(
   const components = computeComponents(frontierKeys, constraints)
   const newCache = new Map<string, ComponentCacheEntry>()
   const result = new Map<string, FrontierExplanation>()
-  // optimize-explanation-extraction D2: one subset-verdict cache for this whole call, shared by
-  // every certain cell's grow/trim/premise queries across all components. Deliberately a plain
-  // mutable local rather than the immutable threading `ComponentCache` uses - it never crosses a
-  // public boundary and is discarded when this call returns.
-  const subsetCache: SubsetVerdictCache = new Map()
 
   for (const cells of components.values()) {
     const cellSet = new Set(cells)
@@ -726,18 +848,16 @@ export function computeExplanations(
 
     let explanationsForComponent = cached?.explanations
     if (!explanationsForComponent) {
+      // D1/D2/D5: built once here - clue index and subset-verdict cache both - and shared by
+      // every certain cell in this component. Subsets from different components are disjoint, so
+      // a per-component cache loses no hit a call-scoped one could have served.
+      const index = buildComponentIndex(relevantConstraints, flagGivens)
       const map = new Map<string, FrontierExplanation>()
       for (const xKey of cells) {
         const f = certainByKey.get(xKey)
         if (!f) continue
         const targetValue: 0 | 1 = f.probability === 1 ? 1 : 0
-        const { clueKeys, premiseKeys } = computeExplanationForCell(
-          subsetCache,
-          xKey,
-          targetValue,
-          constraints,
-          flagGivens,
-        )
+        const { clueKeys, premiseKeys } = computeExplanationForCell(index, xKey, targetValue)
         map.set(xKey, {
           row: f.row,
           col: f.col,
@@ -781,12 +901,18 @@ function constraintsForClues(board: SolverBoard, clueCells: readonly Coord[]): R
   return clueCells.map((c) => byKey.get(key(c.row, c.col))!)
 }
 
-export function computeSubsetSignatureForTest(
+/**
+ * A subset key is only meaningful relative to the index whose ids it is drawn from (D4), so this
+ * builds one over the whole board's constraints - ids assigned in `buildConstraints` order, hence
+ * stable for a given board - and keys the requested subset against it.
+ */
+export function computeSubsetKeyForTest(
   board: SolverBoard,
   clueCells: readonly Coord[],
   flagGivens?: FlagGivensInput,
 ): string {
-  return subsetSignature(constraintsForClues(board, clueCells), toFlagGivens(flagGivens))
+  const index = buildComponentIndex(buildConstraints(board), toFlagGivens(flagGivens))
+  return subsetKey(index, constraintsForClues(board, clueCells))
 }
 
 export function resolveSubsetForTest(
@@ -795,7 +921,8 @@ export function resolveSubsetForTest(
   clueCells: readonly Coord[],
   flagGivens?: FlagGivensInput,
 ): { forcedMine: Coord[]; forcedSafe: Coord[] } {
-  const { tier0 } = resolveSubset(cache, constraintsForClues(board, clueCells), toFlagGivens(flagGivens))
+  const index = buildComponentIndex(buildConstraints(board), toFlagGivens(flagGivens), cache)
+  const { tier0 } = resolveSubset(index, constraintsForClues(board, clueCells))
   return { forcedMine: [...tier0.forcedMine].map(parseKey), forcedSafe: [...tier0.forcedSafe].map(parseKey) }
 }
 
@@ -808,13 +935,12 @@ export function quickXplainForTest(
   targetValue: 0 | 1,
   flagGivens?: FlagGivensInput,
 ): Coord[] {
+  const index = buildComponentIndex(buildConstraints(board), toFlagGivens(flagGivens), cache)
+  const xKey = key(x.row, x.col)
   const trimmed = quickXplain(
-    cache,
+    (subset) => resolvesTo(index, subset, xKey, targetValue),
     constraintsForClues(board, background),
     constraintsForClues(board, candidates),
-    key(x.row, x.col),
-    targetValue,
-    toFlagGivens(flagGivens),
   )
   return trimmed.map((c) => parseKey(c.key))
 }
@@ -828,11 +954,9 @@ export function computeCellExplanationForTest(
   flagGivens?: FlagGivensInput,
 ): { clueCells: Coord[]; premiseCells: Coord[] } {
   const { clueKeys, premiseKeys } = computeExplanationForCell(
-    cache,
+    buildComponentIndex(buildConstraints(board), toFlagGivens(flagGivens), cache),
     key(x.row, x.col),
     targetValue,
-    buildConstraints(board),
-    toFlagGivens(flagGivens),
   )
   return { clueCells: clueKeys.map(parseKey), premiseCells: premiseKeys.map(parseKey) }
 }

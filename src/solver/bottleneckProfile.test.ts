@@ -7,8 +7,10 @@ import {
   enumerateWeightedWorlds,
   getEnumerationCallCountForTest,
   getGrowTrimCallCountForTest,
+  getSubsetKeyCallCountForTest,
   resetEnumerationCallCountForTest,
   resetGrowTrimCallCountForTest,
+  resetSubsetKeyCallCountForTest,
   solve,
   type ComponentCache,
   type SolveResult,
@@ -67,6 +69,7 @@ interface MoveRecord {
   readonly explainMs: number | null
   readonly enumerationDelta: number | null
   readonly growTrimDelta: number | null
+  readonly subsetKeyDelta: number | null
   readonly survivingWorlds: number | null
 }
 
@@ -155,6 +158,7 @@ function playGame(difficulty: Difficulty, seed: number, records: MoveRecord[]): 
     let explainMs: number | null = null
     let enumerationDelta: number | null = null
     let growTrimDelta: number | null = null
+    let subsetKeyDelta: number | null = null
     let survivingWorlds: number | null = null
 
     if (dangerous) {
@@ -162,6 +166,7 @@ function playGame(difficulty: Difficulty, seed: number, records: MoveRecord[]): 
     } else {
       resetEnumerationCallCountForTest()
       resetGrowTrimCallCountForTest()
+      resetSubsetKeyCallCountForTest()
 
       const solveStart = performance.now()
       const solved = solve(solverBoard, cache)
@@ -175,6 +180,7 @@ function playGame(difficulty: Difficulty, seed: number, records: MoveRecord[]): 
       explainMs = performance.now() - explainStart
       cache = explained.cache
       growTrimDelta = getGrowTrimCallCountForTest()
+      subsetKeyDelta = getSubsetKeyCallCountForTest()
 
       if (solveMs > WORLDS_PROBE_THRESHOLD_MS) {
         survivingWorlds = enumerateWeightedWorlds(solverBoard).worlds.length
@@ -201,6 +207,7 @@ function playGame(difficulty: Difficulty, seed: number, records: MoveRecord[]): 
       explainMs,
       enumerationDelta,
       growTrimDelta,
+      subsetKeyDelta,
       survivingWorlds,
     })
   }
@@ -217,6 +224,7 @@ function summarize(difficulty: string, records: readonly MoveRecord[]): void {
 
   const totalSolve = timed.reduce((s, r) => s + (r.solveMs ?? 0), 0)
   const totalExplain = timed.reduce((s, r) => s + (r.explainMs ?? 0), 0)
+  const totalSubsetKeys = timed.reduce((s, r) => s + (r.subsetKeyDelta ?? 0), 0)
   const over50 = timed.filter((r) => (r.solveMs ?? 0) + (r.explainMs ?? 0) > 50).length
   const over200 = timed.filter((r) => (r.solveMs ?? 0) + (r.explainMs ?? 0) > 200).length
 
@@ -228,6 +236,10 @@ function summarize(difficulty: string, records: readonly MoveRecord[]): void {
   )
   // eslint-disable-next-line no-console
   console.log(`  timed total: solve=${totalSolve.toFixed(0)}ms explain=${totalExplain.toFixed(0)}ms`)
+  // eslint-disable-next-line no-console
+  console.log(
+    `  per timed move: explain=${(totalExplain / timed.length).toFixed(3)}ms subsetKeys=${(totalSubsetKeys / timed.length).toFixed(1)} (total ${totalSubsetKeys})`,
+  )
   // eslint-disable-next-line no-console
   console.log(`  timed moves >50ms: ${over50}  >200ms: ${over200}`)
 
@@ -255,7 +267,7 @@ function summarize(difficulty: string, records: readonly MoveRecord[]): void {
     console.log(
       `    seed=${r.seed} move=${r.moveIndex} solve=${(r.solveMs ?? 0).toFixed(1)}ms explain=${(r.explainMs ?? 0).toFixed(1)}ms ` +
         `components=${r.componentCount} maxComponent=${r.maxComponentSize} maxFreeVars=${r.maxFreeVars} frontier=${r.frontierSize} ` +
-        `enumMisses=${r.enumerationDelta} growTrimCalls=${r.growTrimDelta} survivingWorlds=${r.survivingWorlds ?? 'n/a'}`,
+        `enumMisses=${r.enumerationDelta} growTrimCalls=${r.growTrimDelta} subsetKeys=${r.subsetKeyDelta} survivingWorlds=${r.survivingWorlds ?? 'n/a'}`,
     )
   }
 

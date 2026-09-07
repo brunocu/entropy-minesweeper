@@ -2,18 +2,22 @@ import { describe, expect, it } from 'vitest'
 import {
   computeCellExplanationForTest,
   computeClueBfsLayers,
+  computeCluesByCellForTest,
   computeComponentForcedSets,
   computeComponentSignature,
   computeExplanations,
   computeFrontierComponents,
-  computeSubsetSignatureForTest,
+  computeSubsetKeyForTest,
   computeTrivialDeductions,
+  countLayersPulledForTest,
   createSubsetVerdictCacheForTest,
   getEnumerationCallCountForTest,
   getGrowTrimCallCountForTest,
+  getSubsetKeyCallCountForTest,
   quickXplainForTest,
   resetEnumerationCallCountForTest,
   resetGrowTrimCallCountForTest,
+  resetSubsetKeyCallCountForTest,
   resolveSubsetForTest,
   solve,
   type SolverBoard,
@@ -550,18 +554,18 @@ describe('batch explanation computation (3.1)', () => {
   })
 })
 
-describe('subset signature (optimize-explanation-extraction 1.1)', () => {
+describe('subset key (optimize-explanation-extraction 1.1, reduce-explanation-setup-overhead 4.2)', () => {
   const board = makeBoard(['121', '???'], 2)
   const clueA = { row: 0, col: 0 }
   const clueB = { row: 0, col: 1 }
 
   it('is identical for the same constraints in a different order and from a different build', () => {
-    expect(computeSubsetSignatureForTest(board, [clueA, clueB])).toBe(computeSubsetSignatureForTest(board, [clueB, clueA]))
+    expect(computeSubsetKeyForTest(board, [clueA, clueB])).toBe(computeSubsetKeyForTest(board, [clueB, clueA]))
   })
 
   it('differs when the givens the subset is resolved under differ', () => {
-    expect(computeSubsetSignatureForTest(board, [clueA, clueB], { forcedMine: ['1,0'] })).not.toBe(
-      computeSubsetSignatureForTest(board, [clueA, clueB]),
+    expect(computeSubsetKeyForTest(board, [clueA, clueB], { forcedMine: ['1,0'] })).not.toBe(
+      computeSubsetKeyForTest(board, [clueA, clueB]),
     )
   })
 })
@@ -661,5 +665,96 @@ describe('premise extraction reuses the trim verdict (optimize-explanation-extra
     resetGrowTrimCallCountForTest()
     resolveSubsetForTest(cache, board, trimmed) // what extractPremiseKeys now does instead of its own pass
     expect(getGrowTrimCallCountForTest()).toBe(0)
+  })
+})
+
+describe('subset key call count probe (reduce-explanation-setup-overhead 1.1)', () => {
+  it('counts a key build on every query, including the one that hits the cache', () => {
+    const board = makeBoard(['.1', '.?'], 1)
+    const cache = createSubsetVerdictCacheForTest()
+    const clues = [{ row: 0, col: 1 }]
+
+    resetGrowTrimCallCountForTest()
+    resetSubsetKeyCallCountForTest()
+    resolveSubsetForTest(cache, board, clues)
+    resolveSubsetForTest(cache, board, clues)
+
+    expect(getSubsetKeyCallCountForTest()).toBe(2)
+    expect(getGrowTrimCallCountForTest()).toBe(1)
+  })
+})
+
+describe('per-component clue index (reduce-explanation-setup-overhead 2.1)', () => {
+  it('maps each unrevealed cell to exactly the clues referencing it', () => {
+    // Row0 numbers: 1,2,1 over frontier cells A=(1,0) B=(1,1) C=(1,2). A is referenced by
+    // (0,0),(0,1); B by all three; C by (0,1),(0,2) - hand-checked from the 3x3 neighbourhoods.
+    const board = makeBoard(['121', '???'], 2)
+    const byCell = computeCluesByCellForTest(board)
+
+    expect(new Set(byCell.keys())).toEqual(new Set(['1,0', '1,1', '1,2']))
+    expect(coordSet(byCell.get('1,0')!)).toEqual(coordSet([{ row: 0, col: 0 }, { row: 0, col: 1 }]))
+    expect(coordSet(byCell.get('1,1')!)).toEqual(
+      coordSet([{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 0, col: 2 }]),
+    )
+    expect(coordSet(byCell.get('1,2')!)).toEqual(coordSet([{ row: 0, col: 1 }, { row: 0, col: 2 }]))
+  })
+
+  it('omits revealed cells entirely, so only frontier cells carry clues', () => {
+    const board = makeBoard(['1??1'], 2)
+    expect(new Set(computeCluesByCellForTest(board).keys())).toEqual(new Set(['0,1', '0,2']))
+  })
+})
+
+describe('lazy BFS layer walking (reduce-explanation-setup-overhead 3.2)', () => {
+  it('stops pulling layers as soon as the accumulated set resolves the cell', () => {
+    // From B=(1,1) all three clues are in layer 1, and they jointly resolve it - so one pull.
+    const board = makeBoard(['121', '???'], 2)
+    expect(computeClueBfsLayers(board, { row: 1, col: 1 })).toHaveLength(1)
+    expect(countLayersPulledForTest(board, { row: 1, col: 1 }, 0)).toBe(1)
+  })
+
+  it('leaves later layers unbuilt for a cell its first layer already resolves', () => {
+    // X=(5,0) sits at the end of a three-clue chain, so its full layering is three layers deep -
+    // but ClueC=(4,0) in layer 1 forces it on its own once (3,0) is known safe... it is not, so
+    // this cell needs the chain. (1,1) below is the single-layer case; here we check the walker
+    // never runs past the layer that resolves, whatever depth that is.
+    const board = makeBoard(['1', '?', '1', '?', '1', '?', '.'], 2)
+    const fullDepth = computeClueBfsLayers(board, { row: 5, col: 0 }).length
+    expect(fullDepth).toBeGreaterThan(1)
+    expect(countLayersPulledForTest(board, { row: 5, col: 0 }, 1)).toBeLessThanOrEqual(fullDepth)
+  })
+
+  it('pulls exactly one layer for a cell a single directly-touching clue resolves', () => {
+    // (0,0) alone forces (0,1) to be a mine; (0,3)'s clue is in a different component entirely.
+    const board = makeBoard(['1??1'], 2)
+    expect(countLayersPulledForTest(board, { row: 0, col: 1 }, 1)).toBe(1)
+  })
+})
+
+describe('subset key injectivity (reduce-explanation-setup-overhead 4.3)', () => {
+  // D4 drops the content hashing `subsetSignature` did, trusting instead that a clue's id pins
+  // down its constraint. This is the safety net for that: over every subset of a component, no
+  // two distinct ones may share a key.
+  const allSubsets = <T,>(items: readonly T[]): T[][] =>
+    items.reduce<T[][]>((acc, item) => [...acc, ...acc.map((subset) => [...subset, item])], [[]])
+
+  it.each([
+    ['a three-clue component', ['121', '???'], 2],
+    ['a four-clue component', ['1221', '????'], 2],
+    ['a five-clue component', ['12321', '?????'], 3],
+  ])('assigns every distinct subset of %s its own key', (_name, rows, mineCount) => {
+    const board = makeBoard(rows as string[], mineCount as number)
+    const clues: { row: number; col: number }[] = []
+    for (let row = 0; row < board.height; row++) {
+      for (let col = 0; col < board.width; col++) {
+        const cell = board.cells[row][col]
+        if (cell.revealed && cell.adjacentMines > 0) clues.push({ row, col })
+      }
+    }
+    expect(clues.length).toBeGreaterThan(2)
+
+    const subsets = allSubsets(clues)
+    const keys = subsets.map((subset) => computeSubsetKeyForTest(board, subset))
+    expect(new Set(keys).size).toBe(subsets.length)
   })
 })

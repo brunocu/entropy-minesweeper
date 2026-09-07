@@ -168,3 +168,30 @@ why Expert, where oracle work is the largest share, improved the most.
 The scoped-out enumeration follow-up is still real and still needed. It owns the multi-second Expert
 hangs - the 709 Expert moves this harness skips as dangerous, which the table excludes entirely - but
 it cannot own the 1.39ms-per-move floor on Beginner, where there is no enumeration to blame.
+
+### Addendum 2 (2026-09-06): what the staged measurements actually showed
+
+The addendum above was written when `reduce-explanation-setup-overhead` was proposed, before it was
+built. That change has now landed its five decisions in three measured stages, and the numbers
+qualify the addendum's own reasoning as well as the original conclusion. Both are left in place
+above; this records the outcome. The full per-stage table is in
+`openspec/changes/reduce-explanation-setup-overhead/design.md` under Measured Results.
+
+The residual was indeed setup rather than enumeration - explain time fell 25.7% on Beginner, 49.4%
+on Intermediate and 55.9% on Expert with output byte-identical throughout, none of it by touching
+`enumerateComponent`. But the addendum's characterization of that setup as a cost that "does not
+scale with how hard the CSP is" was wrong in its Beginner reading. The two fixes aimed squarely at
+the per-certain-cell graph work - the adjacency rebuild and the discarded BFS layers - are both
+proportional to component size, and they paid accordingly: -41.1% on Expert against -10.8% on
+Beginner. What did behave like a flat per-query cost was the third item, `subsetSignature`: replacing
+it with an id-based key and scoping the verdict cache per component won 10.9 / 13.6 / 13.7% across
+the three difficulties, nearly independent of difficulty.
+
+So the corrected attribution is: the Beginner floor was mostly per-*query* key and cache overhead,
+not per-cell graph setup, and the gradient the addendum read as evidence of a fixed cost was better
+explained by Beginner simply having less of every kind of per-component work.
+
+The scoped-out enumeration-cap follow-up is unaffected by any of this and remains outstanding. It
+owns the multi-second Expert hangs - the 709 Expert moves the harness skips as dangerous, excluded
+from every table in both documents - which is a different problem from the setup overhead
+`reduce-explanation-setup-overhead` addressed, and neither change makes those moves any faster.

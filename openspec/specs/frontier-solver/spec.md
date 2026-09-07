@@ -114,6 +114,10 @@ For each frontier cell whose reported mine probability is exactly 0 or exactly 1
 - **WHEN** a retained revealed numbered cell's constraint is only satisfied for the purpose of the explanation because a specific unrevealed neighbor is already forced to be a mine or forced to be safe
 - **THEN** that unrevealed neighbor is included in the explanation set alongside the revealed numbered cell, regardless of whether it is forced mine or forced safe
 
+#### Scenario: No explanation when the certainty comes from the global mine budget
+- **WHEN** a frontier cell's mine probability is exactly 0 or exactly 1 but its own frontier component's constraints do not force that value, the certainty coming instead from the board's remaining mine count
+- **THEN** that cell's explanation set is empty: no revealed numbered cells and no premise cells
+
 #### Scenario: No explanation for uncertain or non-frontier cells
 - **WHEN** a cell's mine probability is strictly between 0 and 1, or the cell is non-frontier
 - **THEN** the system does not report an explanation set for that cell
