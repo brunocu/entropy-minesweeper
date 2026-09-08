@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { defineConfig, type Plugin } from 'vite'
+import type { Plugin } from 'vite'
+import solidPlugin from 'vite-plugin-solid'
+import { defineConfig } from 'vitest/config'
 import { compileExplainer } from './src/explainer/compileExplainer.ts'
 import { buildIllustrationFiles, ILLUSTRATION_DIR } from './src/explainer/illustrations.ts'
 
@@ -105,11 +107,48 @@ function explainerIllustrations(): Plugin {
   }
 }
 
+/**
+ * `vite-plugin-solid` prepends the `browser` export condition whenever Vite's mode is `test`. That
+ * is what resolves `solid-js` to its DOM build instead of its server one, so a component test gets
+ * the runtime it expects - but it also sends every other package that ships a DOM build there,
+ * including `decode-named-character-reference` (reached through remark), which touches `document`
+ * at import time. The two halves of the suite therefore want different environments, so they are
+ * split into two Vitest projects: components run under jsdom with the plugin whole, everything else
+ * under node with that one hook removed.
+ */
+function solidTransformOnly(): Plugin {
+  const { configEnvironment: _browserConditions, ...transformOnly } = solidPlugin() as Plugin
+  return transformOnly
+}
+
 export default defineConfig({
   base: '/entropy-minesweeper/',
-  plugins: [explainerIllustrations(), explainerMarkdown()],
+  plugins: [solidPlugin(), explainerIllustrations(), explainerMarkdown()],
   worker: {
     format: 'es',
+  },
+  test: {
+    projects: [
+      {
+        plugins: [solidTransformOnly()],
+        test: {
+          name: 'unit',
+          /* No DOM by design: `boardRenderer.test.ts` and friends stub the Canvas2D surface they
+           * need, and several tests read fixtures through `import.meta.url`, which jsdom rewrites
+           * to an `http:` URL they cannot open. */
+          environment: 'node',
+          include: ['src/**/*.test.ts'],
+        },
+      },
+      {
+        plugins: [solidPlugin()],
+        test: {
+          name: 'ui',
+          environment: 'jsdom',
+          include: ['src/**/*.test.tsx'],
+        },
+      },
+    ],
   },
   build: {
     rollupOptions: {

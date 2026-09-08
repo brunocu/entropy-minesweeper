@@ -14,6 +14,10 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* JSX is compiled by vite-plugin-solid's Babel pass, not by tsc; tsc only type-checks it. */
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

@@ -1,7 +1,7 @@
 /* Game-page chrome, expressed against the shared tokens so the board page and the explainer read
- * as one site. `main.ts` still sets these properties inline and therefore still wins; it is
- * replaced wholesale by the Solid port, which emits these class names instead
- * (unify-design-tokens design.md, decision 4). Until then the two states coexist. */
+ * as one site. These class names are the only place the game page's layout is set: the Solid
+ * components under `src/ui/` emit them and set no styles inline (unify-design-tokens design.md,
+ * decision 4). */
 
 body {
   margin: 0;
