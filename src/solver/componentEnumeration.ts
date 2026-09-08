@@ -1,6 +1,4 @@
 // Per-component exact enumeration and the component cache that keys it.
-// See openspec/changes/entropy-minesweeper/specs/frontier-solver/spec.md and
-// openspec/changes/cache-frontier-explanations-by-component/design.md decisions 1-4.
 
 import { applyTrivialDeduction, buildConstraints, type RawConstraint } from './decomposition.ts'
 import type { FrontierExplanation } from './explanation.ts'
@@ -40,14 +38,17 @@ export interface ComponentEnumeration {
 }
 
 /**
- * 3.4 Per-component exact backtracking enumeration, with Tier 0 pre-applied. Also exposes
- * the component's real (untrimmed) forced-mine/forced-safe sets (design.md Decision 5, step 1)
+ * Per-component exact backtracking enumeration, with Tier 0 pre-applied. Also exposes
+ * the component's real (untrimmed) forced-mine/forced-safe sets
  * instead of discarding them, so they can be intersected with flagged cells elsewhere.
  */
 export function enumerateComponentFull(
-  componentCells: string[],
+  componentCells: readonly string[],
   constraints: readonly RawConstraint[],
 ): ComponentEnumeration {
+  // Accepts either the whole board's constraints or a component's own slice: the filter is
+  // idempotent, so a caller that already holds the slice can hand it over and pay only for its
+  // own clues.
   const componentSet = new Set(componentCells)
   const relevantConstraints = constraints.filter((c) => c.cells.some((k) => componentSet.has(k)))
 
@@ -107,8 +108,7 @@ export function enumerateComponent(
   return enumerateComponentFull(componentCells, constraints).assignments
 }
 
-// --- Component cache (cache-frontier-explanations-by-component) ---
-// See openspec/changes/cache-frontier-explanations-by-component/design.md decisions 1-4.
+// --- Component cache ---
 
 export interface ComponentCacheEntry {
   readonly enumeration: ComponentEnumeration
@@ -118,7 +118,7 @@ export interface ComponentCacheEntry {
 export type ComponentCache = ReadonlyMap<string, ComponentCacheEntry>
 
 /**
- * design.md Decision D1: canonical signature of a component's own constraint structure
+ * Canonical signature of a component's own constraint structure
  * (clue cells, required-mine counts, member cells) plus the flagged subset of its cells.
  * Equal signature guarantees equal cached output by construction, since this is exactly
  * the input `enumerateComponentFull`/`computeExplanationForCell` are a pure function of.
@@ -139,7 +139,7 @@ export function componentSignature(
   return `${constraintPart}|flags=${flagPart}`
 }
 
-/** Test-only view of a frontier component's canonical cache signature (design.md Decision D1). */
+/** Test-only view of a frontier component's canonical cache signature. */
 export function computeComponentSignature(
   board: SolverBoard,
   componentCells: readonly Coord[],

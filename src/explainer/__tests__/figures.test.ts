@@ -6,6 +6,7 @@
 // against a second hand-typed copy.
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
+import { decompose } from '../../solver/decomposition.ts'
 import { solve } from '../../solver/probability.ts'
 import { compileExplainer, computeFigureValues } from '../compileExplainer.ts'
 import {
@@ -57,7 +58,7 @@ describe('figures quoted in the compiled explainer page', () => {
     // The prose spells these out in TeX, where a data-figure span cannot reach. Pinning the
     // relationships instead means a fixture change fails here and forces the prose to be
     // revisited, rather than leaving the article quietly arguing something untrue.
-    const { result: treeSolve } = solve(WORLDS_TREE_BOARD, new Map())
+    const { result: treeSolve } = solve(decompose(WORLDS_TREE_BOARD), new Map())
     const focus = treeSolve.frontier.find(
       (f) => f.row === WORLDS_TREE_FOCUS_CELL.row && f.col === WORLDS_TREE_FOCUS_CELL.col,
     )!
@@ -85,10 +86,12 @@ describe('captions live in the page, not baked into the images', () => {
     // branch plus "— ruled out" - but a sentence belongs in the figcaption.
     const { renderWorldsTree } = await import('../worldsTree.ts')
     const { renderCertaintyBoard } = await import('../certaintyBoard.ts')
+    const { solveFixture } = await import('../solvedFixture.ts')
+    const worldsTree = solveFixture(WORLDS_TREE_BOARD)
     const svgs = [
-      renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'probability'),
-      renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'eig'),
-      renderCertaintyBoard(CERTAINTY_BOARD, CERTAINTY_FOCUS_CELL),
+      renderWorldsTree(worldsTree, WORLDS_TREE_FOCUS_CELL, 'probability'),
+      renderWorldsTree(worldsTree, WORLDS_TREE_FOCUS_CELL, 'eig'),
+      renderCertaintyBoard(solveFixture(CERTAINTY_BOARD), CERTAINTY_FOCUS_CELL),
     ]
     for (const svg of svgs) {
       for (const match of svg.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)) {

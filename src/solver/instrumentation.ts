@@ -1,11 +1,9 @@
 // Call counters shared by the solver's explanation and probability halves.
-// See openspec/changes/split-solver-modules/design.md Decision D4: the counters keep their
-// existing names and module-level mutable state; only the increment sites move, to the
-// `increment*` functions below, because those sites straddle two modules and a counter read
-// by tests from both halves cannot live in either.
+// They live here, rather than in either half, because the sites that increment them straddle
+// both modules and a counter read by tests from either side cannot belong to one of them.
 
 /**
- * Test-only call-count probes (cache-frontier-explanations-by-component tasks 2.4/3.2/3.3).
+ * Test-only call-count probes.
  * `enumerationCallCount` counts a component's full (exponential-in-component-size) enumeration
  * being (re)computed from scratch - incremented at `solve`'s and `computeExplanations`'s
  * top-level per-component cache-miss call sites, not inside `enumerateComponentFull` itself, so
@@ -37,8 +35,7 @@ export function getGrowTrimCallCountForTest(): number {
 /**
  * `subsetKeyCallCount` counts subset-key builds, *including* the ones that go on to hit the
  * subset-verdict cache - which is exactly what `growTrimCallCount` (misses only) cannot show.
- * Sizing that gap is what tells us whether the per-query key build is worth optimizing
- * (reduce-explanation-setup-overhead design D6).
+ * Sizing that gap is what tells us whether the per-query key build is worth optimizing.
  */
 let subsetKeyCallCount = 0
 export function incrementSubsetKeyCallCount(): void {
@@ -49,4 +46,20 @@ export function resetSubsetKeyCallCountForTest(): void {
 }
 export function getSubsetKeyCallCountForTest(): number {
   return subsetKeyCallCount
+}
+
+/**
+ * `decompositionCallCount` counts full board decompositions - frontier, constraints, components
+ * and their constraint slices. `solve` and `computeExplanations` share one `Decomposition` per
+ * board state rather than each deriving its own, and this counter is what pins that down.
+ */
+let decompositionCallCount = 0
+export function incrementDecompositionCallCount(): void {
+  decompositionCallCount++
+}
+export function resetDecompositionCallCountForTest(): void {
+  decompositionCallCount = 0
+}
+export function getDecompositionCallCountForTest(): number {
+  return decompositionCallCount
 }

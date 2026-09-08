@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Board } from '../../board/board.ts'
-import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import { computeFrontierComponents, computeTrivialDeductions, decompose } from '../decomposition.ts'
 import { computeExplanations, type FrontierExplanation } from '../explanation.ts'
 import { solve } from '../probability.ts'
 import type { Coord, SolverBoard } from '../types.ts'
@@ -13,7 +13,7 @@ import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 import { makeBoard } from '../../__tests__/support/makeBoard.ts'
 
 /**
- * The acceptance gate for reduce-explanation-setup-overhead (tasks 1.4, 1.5).
+ * The acceptance gate for the explanation pipeline.
  *
  * `frontier-solver`'s "Minimal Certainty Explanation" requirement is what an explanation must
  * satisfy - sufficient, irreducible, and confined to the cell's own frontier component - so these
@@ -174,14 +174,15 @@ interface CertainCell {
    * weighting knows and the explainer - scoped to frontier constraints by design - does not. For
    * those, `growSufficientSet` exhausts every layer without resolving and `quickXplain` falls back
    * to returning all of them, so no sufficient or irreducible explanation exists to assert on.
-   * A known, pre-existing limitation, untouched by reduce-explanation-setup-overhead.
+   * A known, long-standing limitation.
    */
   readonly locallyForced: boolean
 }
 
 function certainCells(board: SolverBoard): CertainCell[] {
-  const result = solve(board, new Map()).result
-  const explanations = computeExplanations(board, result, new Set(), new Map()).explanations
+  const decomposition = decompose(board)
+  const result = solve(decomposition, new Map()).result
+  const explanations = computeExplanations(decomposition, result, new Set(), new Map()).explanations
 
   const componentOf = new Map<string, Coord[]>()
   for (const cells of computeFrontierComponents(board)) {
@@ -209,7 +210,7 @@ function certainCells(board: SolverBoard): CertainCell[] {
   return out
 }
 
-describe('component-scoped BFS layering equals whole-board layering (1.4)', () => {
+describe('component-scoped BFS layering equals whole-board layering', () => {
   it('yields identical layers for every certain cell across the battery, multi-component boards included', () => {
     let checked = 0
     for (const board of BATTERY) {
@@ -222,7 +223,7 @@ describe('component-scoped BFS layering equals whole-board layering (1.4)', () =
   })
 })
 
-describe('minimal certainty explanation properties (1.5)', () => {
+describe('minimal certainty explanation properties', () => {
   it('is sufficient: each explanation\'s clues alone force the cell to its reported value', () => {
     let checked = 0
     for (const board of BATTERY) {
@@ -342,7 +343,7 @@ function parseCoord(cellKey: string): Coord {
   return { row, col }
 }
 
-describe('lazy layer walking matches the eager layering it replaced (3.1)', () => {
+describe('lazy layer walking matches the eager layering it replaced', () => {
   it('drains to exactly the layers the pre-D3 adjacency-and-full-walk algorithm produced', () => {
     let checked = 0
     for (const board of BATTERY) {
@@ -355,12 +356,13 @@ describe('lazy layer walking matches the eager layering it replaced (3.1)', () =
   })
 })
 
-describe('explanation determinism covers computeExplanations end to end (1.5)', () => {
+describe('explanation determinism covers computeExplanations end to end', () => {
   it('returns identical output across repeated calls over the whole battery', () => {
     for (const board of BATTERY) {
-      const result = solve(board, new Map()).result
-      const first = computeExplanations(board, result, new Set(), new Map()).explanations
-      const second = computeExplanations(board, result, new Set(), new Map()).explanations
+      const decomposition = decompose(board)
+      const result = solve(decomposition, new Map()).result
+      const first = computeExplanations(decomposition, result, new Set(), new Map()).explanations
+      const second = computeExplanations(decomposition, result, new Set(), new Map()).explanations
       expect(second).toEqual(first)
     }
   })

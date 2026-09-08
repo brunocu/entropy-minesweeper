@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { CLUE_HIGHLIGHT_COLOR, PREMISE_HIGHLIGHT_COLOR } from '../../render/probabilityColor.ts'
 import { computeExplanations } from '../../solver/explanation.ts'
-import { solve } from '../../solver/probability.ts'
 import { renderCertaintyBoard } from '../certaintyBoard.ts'
 import { CERTAINTY_BOARD, CERTAINTY_FOCUS_CELL } from '../fixtures.ts'
+import { solveFixture } from '../solvedFixture.ts'
 
-describe('certainty-explanation board generator (3.3)', () => {
-  const svg = renderCertaintyBoard(CERTAINTY_BOARD, CERTAINTY_FOCUS_CELL)
-  const { result } = solve(CERTAINTY_BOARD, new Map())
-  const { explanations } = computeExplanations(CERTAINTY_BOARD, result, new Set(), new Map())
+describe('certainty-explanation board generator', () => {
+  const fixture = solveFixture(CERTAINTY_BOARD)
+  const svg = renderCertaintyBoard(fixture, CERTAINTY_FOCUS_CELL)
+  const { decomposition, result } = fixture
+  const { explanations } = computeExplanations(decomposition, result, new Set(), new Map())
   const explanation = explanations.get(`${CERTAINTY_FOCUS_CELL.row},${CERTAINTY_FOCUS_CELL.col}`)!
 
   /** The one `<rect>` carrying this cell's explanation highlight, or undefined. */

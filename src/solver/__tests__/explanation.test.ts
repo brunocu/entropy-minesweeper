@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import { computeFrontierComponents, computeTrivialDeductions, decompose } from '../decomposition.ts'
 import { computeExplanations } from '../explanation.ts'
 import {
   getGrowTrimCallCountForTest,
@@ -8,6 +8,7 @@ import {
   resetSubsetKeyCallCountForTest,
 } from '../instrumentation.ts'
 import { solve } from '../probability.ts'
+import type { SolverBoard } from '../types.ts'
 import { makeBoard } from '../../__tests__/support/makeBoard.ts'
 import {
   computeCellExplanationForTest,
@@ -25,7 +26,14 @@ function coordSet(coords: readonly { row: number; col: number }[]): Set<string> 
   return new Set(coords.map((c) => `${c.row},${c.col}`))
 }
 
-describe('clue-adjacency BFS layering (1.1, 1.2)', () => {
+/** Solve then explain a board through one shared decomposition, the way `GameController` does. */
+function explainBoard(board: SolverBoard, flaggedCells: ReadonlySet<string> = new Set()) {
+  const decomposition = decompose(board)
+  const { result } = solve(decomposition, new Map())
+  return computeExplanations(decomposition, result, flaggedCells, new Map())
+}
+
+describe('clue-adjacency BFS layering', () => {
   it('groups same-distance clues into one layer and orders layers outward from the given cell', () => {
     // Row0 numbers: 1,2,1 over frontier cells A=(1,0) B=(1,1) C=(1,2).
     // From A: (0,0) and (0,1) both touch A directly (layer 1); (0,2) only reachable via
@@ -56,10 +64,10 @@ describe('clue-adjacency BFS layering (1.1, 1.2)', () => {
   })
 })
 
-describe('grow-then-trim minimal explanation search (2.1, 2.2)', () => {
+describe('grow-then-trim minimal explanation search', () => {
   it('needs only the one clue that resolves it via Tier-0 alone', () => {
     const board = makeBoard(['.1', '.?'], 1)
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     const explanation = explanations.get('1,1')!
     expect(coordSet(explanation.clueCells)).toEqual(coordSet([{ row: 0, col: 1 }]))
   })
@@ -68,7 +76,7 @@ describe('grow-then-trim minimal explanation search (2.1, 2.2)', () => {
     // In the 1-2-1 pattern, B=(1,1) is the one cell whose certainty needs all three
     // clues together - no two of them alone force it (verified by hand above).
     const board = makeBoard(['121', '???'], 2)
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     const explanation = explanations.get('1,1')!
     expect(coordSet(explanation.clueCells)).toEqual(
       coordSet([
@@ -80,7 +88,7 @@ describe('grow-then-trim minimal explanation search (2.1, 2.2)', () => {
   })
 })
 
-describe('trim-phase minimality (2.2)', () => {
+describe('trim-phase minimality', () => {
   it('leaves no redundant member: removing any single clue changes the resolved certainty', () => {
     // B=(1,1) needs all three clues jointly (verified above); each is individually load-bearing.
     // The extra all-unrevealed row keeps some non-frontier cells in play (K > 0), so dropping a
@@ -88,7 +96,7 @@ describe('trim-phase minimality (2.2)', () => {
     // coincidence pinning the frontier's mine total to a single value regardless of the clue.
     const rows = ['121', '???', '???']
     const board = makeBoard(rows, 2)
-    const explanation = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations.get('1,1')!
+    const explanation = explainBoard(board).explanations.get('1,1')!
     for (const dropped of explanation.clueCells) {
       // Blanking (not unrevealing) the clue removes its constraint without introducing a new
       // frontier variable in its place, matching what dropping a constraint means internally.
@@ -96,13 +104,14 @@ describe('trim-phase minimality (2.2)', () => {
         r === dropped.row ? row.slice(0, dropped.col) + '.' + row.slice(dropped.col + 1) : row,
       )
       const withoutDropped = makeBoard(blankedRows, 2)
-      const stillCertain = solve(withoutDropped, new Map()).result.frontier.find((f) => f.row === 1 && f.col === 1)?.probability === 0
+      const stillCertain =
+        solve(decompose(withoutDropped), new Map()).result.frontierByKey.get('1,1')?.probability === 0
       expect(stillCertain).toBe(false)
     }
   })
 })
 
-describe('premise-cell extraction (2.3)', () => {
+describe('premise-cell extraction', () => {
   // Deduction chain over a width-1 corridor: ClueA=(0,0) forces M1=(1,0) mine on its own;
   // ClueB=(2,0) (touching M1,M2) then forces M2=(3,0) safe using M1 as a premise; ClueC=(4,0)
   // (touching M2,X) then forces X=(5,0) mine using M2 as a premise. (6,0) caps the corridor
@@ -110,47 +119,45 @@ describe('premise-cell extraction (2.3)', () => {
   const board = makeBoard(['1', '?', '1', '?', '1', '?', '.'], 2)
 
   it("includes a forced-mine neighbor the explanation's own clues rely on", () => {
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     const explanation = explanations.get('5,0')!
     expect(explanation.premiseCells).toContainEqual({ row: 1, col: 0 })
   })
 
   it("includes a forced-safe neighbor the explanation's own clues rely on", () => {
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     const explanation = explanations.get('5,0')!
     expect(explanation.premiseCells).toContainEqual({ row: 3, col: 0 })
   })
 })
 
-describe('explanation-set determinism (2.4)', () => {
+describe('explanation-set determinism', () => {
   it('returns an identical result across repeated queries for the same board state', () => {
     const board = makeBoard(['121', '???'], 2)
-    const result = solve(board, new Map()).result
-    const first = computeExplanations(board, result, new Set(), new Map()).explanations
-    const second = computeExplanations(board, result, new Set(), new Map()).explanations
-    expect(first).toEqual(second)
+    expect(explainBoard(board).explanations).toEqual(explainBoard(board).explanations)
   })
 })
 
-describe('explanation exclusion cases (2.5)', () => {
+describe('explanation exclusion cases', () => {
   it('reports no explanation for a cell whose probability is strictly between 0 and 1', () => {
     const board = makeBoard(['11', '??'], 1)
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     expect(explanations.has('1,0')).toBe(false)
   })
 
   it('reports no explanation for a non-frontier cell', () => {
     const board = makeBoard(['1??'], 1)
-    const result = solve(board, new Map()).result
+    const decomposition = decompose(board)
+    const result = solve(decomposition, new Map()).result
     expect(result.nonFrontierCells).toContainEqual({ row: 0, col: 2 })
-    const explanations = computeExplanations(board, result, new Set(), new Map()).explanations
+    const explanations = computeExplanations(decomposition, result, new Set(), new Map()).explanations
     expect(explanations.has('0,2')).toBe(false)
   })
 
   it("excludes a same-component clue that doesn't affect the cell's certainty", () => {
     // A=(1,0)'s minimal explanation is {(0,1),(0,2)}; (0,0) shares the component but is redundant for A.
     const board = makeBoard(['121', '???'], 2)
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     const explanation = explanations.get('1,0')!
     expect(explanation.clueCells).not.toContainEqual({ row: 0, col: 0 })
     expect(coordSet(explanation.clueCells)).toEqual(
@@ -162,7 +169,7 @@ describe('explanation exclusion cases (2.5)', () => {
   })
 })
 
-describe('exposed real per-component forced sets (7.1)', () => {
+describe('exposed real per-component forced sets', () => {
   it('exposes exactly the pre-backtracking Tier-0 fixed map, even on a fixture the solver only resolves via backtracking', () => {
     // The 1-2-1 pattern needs full backtracking to resolve A/B/C to certainty (verified
     // above) - Tier-0 alone forces nothing. The map `enumerateComponent` already computes
@@ -182,15 +189,18 @@ describe('exposed real per-component forced sets (7.1)', () => {
   })
 })
 
-describe('flag-aware premise seeding (8.4)', () => {
+describe('flag-aware premise seeding', () => {
   it('omits an extra BFS layer needed only to prove a flagged, globally-forced neighbor', () => {
     // Same deduction chain as the premise-extraction fixture above: ClueA forces M1 mine,
     // ClueB then needs M1 to force M2 safe, ClueC then needs M2 to force X mine - X's
     // unflagged explanation needs all three clues.
+    // The two flag states share one decomposition and one solve, which is exactly what the
+    // decomposition being flag-free buys: only the flagged set differs between the calls.
     const board = makeBoard(['1', '?', '1', '?', '1', '?', '.'], 2)
-    const solveResult = solve(board, new Map()).result
+    const decomposition = decompose(board)
+    const solveResult = solve(decomposition, new Map()).result
 
-    const withoutFlag = computeExplanations(board, solveResult, new Set(), new Map()).explanations.get('5,0')!
+    const withoutFlag = computeExplanations(decomposition, solveResult, new Set(), new Map()).explanations.get('5,0')!
     expect(coordSet(withoutFlag.clueCells)).toEqual(
       coordSet([
         { row: 0, col: 0 },
@@ -199,7 +209,9 @@ describe('flag-aware premise seeding (8.4)', () => {
       ]),
     )
 
-    const withFlag = computeExplanations(board, solveResult, new Set(['1,0']), new Map()).explanations.get('5,0')!
+    const withFlag = computeExplanations(decomposition, solveResult, new Set(['1,0']), new Map()).explanations.get(
+      '5,0',
+    )!
     expect(coordSet(withFlag.clueCells)).toEqual(
       coordSet([
         { row: 2, col: 0 },
@@ -211,35 +223,32 @@ describe('flag-aware premise seeding (8.4)', () => {
   })
 })
 
-describe('flag rejection when not globally forced (8.5)', () => {
+describe('flag rejection when not globally forced', () => {
   it('has no effect on any explanation when the flagged cell is not independently, globally forced', () => {
     // Component with A=(1,0),B=(1,1) ambiguous (either could be the shared mine) but
-    // C=(1,2) forced safe and D=(1,3) forced mine regardless - design.md Decision 5's
-    // rejected "Option A" would let flagging an ambiguous cell shortcut a derivation;
-    // this confirms that never happens.
+    // C=(1,2) forced safe and D=(1,3) forced mine regardless. Letting a flag on an ambiguous
+    // cell shortcut a derivation was considered and rejected; this confirms it never happens.
     const board = makeBoard(['11.1', '????'], 2)
-    const solveResult = solve(board, new Map()).result
-    const withoutFlag = computeExplanations(board, solveResult, new Set(), new Map()).explanations
-    const withFlag = computeExplanations(board, solveResult, new Set(['1,0']), new Map()).explanations
+    const decomposition = decompose(board)
+    const solveResult = solve(decomposition, new Map()).result
+    const withoutFlag = computeExplanations(decomposition, solveResult, new Set(), new Map()).explanations
+    const withFlag = computeExplanations(decomposition, solveResult, new Set(['1,0']), new Map()).explanations
     expect(withFlag.get('1,3')).toEqual(withoutFlag.get('1,3'))
   })
 })
 
-describe('explanation-set determinism with flags (8.6)', () => {
+describe('explanation-set determinism with flags', () => {
   it('returns an identical result across repeated queries for the same board and flag state', () => {
     const board = makeBoard(['1', '?', '1', '?', '1', '?', '.'], 2)
-    const result = solve(board, new Map()).result
     const flagged = new Set(['1,0'])
-    const first = computeExplanations(board, result, flagged, new Map()).explanations
-    const second = computeExplanations(board, result, flagged, new Map()).explanations
-    expect(first).toEqual(second)
+    expect(explainBoard(board, flagged).explanations).toEqual(explainBoard(board, flagged).explanations)
   })
 })
 
-describe('batch explanation computation (3.1)', () => {
+describe('batch explanation computation', () => {
   it('computes an explanation for every certain frontier cell on a board with multiple independent certainties', () => {
     const board = makeBoard(['1??1'], 2)
-    const explanations = computeExplanations(board, solve(board, new Map()).result, new Set(), new Map()).explanations
+    const explanations = explainBoard(board).explanations
     expect(explanations.has('0,1')).toBe(true)
     expect(explanations.has('0,2')).toBe(true)
     expect(coordSet(explanations.get('0,1')!.clueCells)).toEqual(coordSet([{ row: 0, col: 0 }]))
@@ -247,7 +256,7 @@ describe('batch explanation computation (3.1)', () => {
   })
 })
 
-describe('subset key (optimize-explanation-extraction 1.1, reduce-explanation-setup-overhead 4.2)', () => {
+describe('subset key', () => {
   const board = makeBoard(['121', '???'], 2)
   const clueA = { row: 0, col: 0 }
   const clueB = { row: 0, col: 1 }
@@ -263,7 +272,7 @@ describe('subset key (optimize-explanation-extraction 1.1, reduce-explanation-se
   })
 })
 
-describe('subset verdict cache (optimize-explanation-extraction 1.2, 1.4)', () => {
+describe('subset verdict cache', () => {
   it('recomputes a subset only on the first query for it', () => {
     const board = makeBoard(['.1', '.?'], 1)
     const cache = createSubsetVerdictCacheForTest()
@@ -283,7 +292,9 @@ describe('subset verdict cache (optimize-explanation-extraction 1.2, 1.4)', () =
     // probes subsets of the same three clues - so a shared cache turns most of the second and
     // third cells' queries into hits.
     const board = makeBoard(['121', '???'], 2)
-    const certain = solve(board, new Map()).result.frontier.filter((f) => f.probability === 0 || f.probability === 1)
+    const certain = solve(decompose(board), new Map()).result.frontier.filter(
+      (f) => f.probability === 0 || f.probability === 1,
+    )
     expect(certain.length).toBeGreaterThan(1)
     const explain = (cacheFor: (f: (typeof certain)[number]) => ReturnType<typeof createSubsetVerdictCacheForTest>): void => {
       for (const f of certain) {
@@ -302,7 +313,7 @@ describe('subset verdict cache (optimize-explanation-extraction 1.2, 1.4)', () =
   })
 })
 
-describe('QuickXplain minimization (optimize-explanation-extraction 2.1)', () => {
+describe('QuickXplain minimization', () => {
   it('returns a single-element candidate set unchanged', () => {
     const board = makeBoard(['.1', '.?'], 1)
     const trimmed = quickXplainForTest(createSubsetVerdictCacheForTest(), board, [], [{ row: 0, col: 1 }], { row: 1, col: 1 }, 1)
@@ -340,7 +351,7 @@ describe('QuickXplain minimization (optimize-explanation-extraction 2.1)', () =>
   })
 })
 
-describe('premise extraction reuses the trim verdict (optimize-explanation-extraction 3.1)', () => {
+describe('premise extraction reuses the trim verdict', () => {
   it('finds the trimmed set already in the cache once QuickXplain has minimized it', () => {
     const board = makeBoard(['121', '???'], 2)
     const cache = createSubsetVerdictCacheForTest()
@@ -361,7 +372,7 @@ describe('premise extraction reuses the trim verdict (optimize-explanation-extra
   })
 })
 
-describe('subset key call count probe (reduce-explanation-setup-overhead 1.1)', () => {
+describe('subset key call count probe', () => {
   it('counts a key build on every query, including the one that hits the cache', () => {
     const board = makeBoard(['.1', '.?'], 1)
     const cache = createSubsetVerdictCacheForTest()
@@ -377,7 +388,7 @@ describe('subset key call count probe (reduce-explanation-setup-overhead 1.1)', 
   })
 })
 
-describe('per-component clue index (reduce-explanation-setup-overhead 2.1)', () => {
+describe('per-component clue index', () => {
   it('maps each unrevealed cell to exactly the clues referencing it', () => {
     // Row0 numbers: 1,2,1 over frontier cells A=(1,0) B=(1,1) C=(1,2). A is referenced by
     // (0,0),(0,1); B by all three; C by (0,1),(0,2) - hand-checked from the 3x3 neighbourhoods.
@@ -398,7 +409,7 @@ describe('per-component clue index (reduce-explanation-setup-overhead 2.1)', () 
   })
 })
 
-describe('lazy BFS layer walking (reduce-explanation-setup-overhead 3.2)', () => {
+describe('lazy BFS layer walking', () => {
   it('stops pulling layers as soon as the accumulated set resolves the cell', () => {
     // From B=(1,1) all three clues are in layer 1, and they jointly resolve it - so one pull.
     const board = makeBoard(['121', '???'], 2)
@@ -424,7 +435,7 @@ describe('lazy BFS layer walking (reduce-explanation-setup-overhead 3.2)', () =>
   })
 })
 
-describe('subset key injectivity (reduce-explanation-setup-overhead 4.3)', () => {
+describe('subset key injectivity', () => {
   // D4 drops the content hashing `subsetSignature` did, trusting instead that a clue's id pins
   // down its constraint. This is the safety net for that: over every subset of a component, no
   // two distinct ones may share a key.

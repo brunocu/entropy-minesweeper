@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { decompose } from '../../solver/decomposition.ts'
 import { solve } from '../../solver/probability.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { pickWeighted, simulateReveal, worldCount } from '../predictedVsRealized.ts'
 
-const { result: preSolve } = solve(WORLDS_TREE_BOARD, new Map())
+const { result: preSolve } = solve(decompose(WORLDS_TREE_BOARD), new Map())
 const focusResult = preSolve.frontier.find(
   (f) => f.row === WORLDS_TREE_FOCUS_CELL.row && f.col === WORLDS_TREE_FOCUS_CELL.col,
 )!
 
-describe('predicted-vs-realized demo (6.1)', () => {
+describe('predicted-vs-realized demo', () => {
   it('draws outcomes in proportion to their solver-computed probabilities', () => {
     const random = mulberry32(20260904)
     const trials = 20000

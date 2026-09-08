@@ -1,10 +1,10 @@
 // p -> color mapping for the probability heatmap: a diverging scale so p=0 (certainly safe)
 // and p=1 (certainly mined) read as visually opposite poles, with p=0.5 (peak uncertainty)
-// as the neutral midpoint (design.md decision 5, revised from an initial sequential-H(p)
-// design that mapped both p=0 and p=1 to the same color).
+// as the neutral midpoint. Revised from an initial sequential-H(p) design that mapped both
+// p=0 and p=1 to the same color.
 //
 // Also holds a second, sequential eig -> color mapping for certain-safe (p=0) frontier
-// cells' EIG-gradient fill (revise-eig-visualization design.md decision 3): the two scales
+// cells' EIG-gradient fill: the two scales
 // share the hex-mixing helpers below, so this module's purpose is "p/eig -> color mapping
 // for the visualization."
 //
@@ -19,8 +19,8 @@ const NEUTRAL_MIDPOINT = '#c0c0c0' // diverging neutral midpoint, light surface
 const EIG_LOW = '#e3dff5' // light violet tint, near-surface (low EIG)
 const EIG_HIGH = '#4a3aa7' // categorical slot 7 violet, full saturation (high EIG)
 
-// Certainty-explanation highlight outline colors (frontier-certainty-explanation design.md
-// decision 5): two more categorical slots, distinct from the diverging poles above and the
+// Certainty-explanation highlight outline colors: two more categorical slots, distinct from
+// the diverging poles above and the
 // EIG ramp's violet, so the explanation overlay never reads as another probability/EIG value.
 const CLUE_HIGHLIGHT = '#1baf7a' // categorical slot 3, aqua (revealed numbered clue cells)
 // Slot 5 magenta read too close to the mine-pole red on a p=1 (mine-colored) premise cell;

@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { Board } from '../../board/board.ts'
-import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import { computeFrontierComponents, computeTrivialDeductions, decompose } from '../decomposition.ts'
 import type { ComponentCache } from '../componentEnumeration.ts'
 import { computeExplanations } from '../explanation.ts'
 import { solve } from '../probability.ts'
@@ -10,7 +10,7 @@ import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 
 /**
- * Output tripwire for reduce-explanation-setup-overhead (task 1.2, design D6).
+ * Output tripwire for the explanation pipeline.
  *
  * Serializes `computeExplanations`' *full* output - every certain cell's `clueCells` and
  * `premiseCells` - over a fixed battery of played-out boards, so a stage that is argued to be
@@ -118,8 +118,9 @@ function playGame(difficulty: Difficulty, seed: number, lines: string[]): void {
     if (maxFreeVars(solverBoard) > SAFE_FREE_VAR_CAP) {
       ;[row, col] = pickCheapMove(board, solverBoard, rng)
     } else {
-      const solved = solve(solverBoard, cache)
-      const explained = computeExplanations(solverBoard, solved.result, new Set(), solved.cache)
+      const decomposition = decompose(solverBoard)
+      const solved = solve(decomposition, cache)
+      const explained = computeExplanations(decomposition, solved.result, new Set(), solved.cache)
       cache = explained.cache
       lines.push(`  ${difficulty.name} seed=${seed} move=${moveIndex}`)
       lines.push(...serializeExplanations(explained.explanations))

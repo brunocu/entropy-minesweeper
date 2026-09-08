@@ -1,16 +1,51 @@
 import { describe, expect, it } from 'vitest'
-import { enumerateWeightedWorlds, solve } from '../../solver/probability.ts'
+import {
+  getEnumerationCallCountForTest,
+  resetEnumerationCallCountForTest,
+} from '../../solver/instrumentation.ts'
+import { solveFixture } from '../solvedFixture.ts'
 import { WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { buildWorldsTreeModel, renderWorldsTree } from '../worldsTree.ts'
 
 const focusKey = `${WORLDS_TREE_FOCUS_CELL.row},${WORLDS_TREE_FOCUS_CELL.col}`
-const { result } = solve(WORLDS_TREE_BOARD, new Map())
-const focusResult = result.frontier.find((f) => `${f.row},${f.col}` === focusKey)!
-const worldCount = enumerateWeightedWorlds(WORLDS_TREE_BOARD).worlds.length
+const worldsTreeFixture = solveFixture(WORLDS_TREE_BOARD)
+const result = worldsTreeFixture.result
+const focusResult = result.frontierByKey.get(focusKey)!
+const worldCount = worldsTreeFixture.worlds.length
 
-describe('worlds-tree probability mode (3.1)', () => {
-  const model = buildWorldsTreeModel(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'probability')
-  const svg = renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'probability')
+describe('worlds-tree numbers come from one enumeration', () => {
+  it('gets the branches and the numbers beside them from a single enumeration', () => {
+    // One `solveFixture` yields both views - the branches and the numbers quoted beside them -
+    // from a single enumeration of the board.
+    resetEnumerationCallCountForTest()
+    const fixture = solveFixture(WORLDS_TREE_BOARD)
+    const componentCount = fixture.decomposition.componentSlices.length
+
+    expect(componentCount).toBeGreaterThan(0)
+    expect(getEnumerationCallCountForTest()).toBe(componentCount)
+    expect(fixture.worlds.length).toBeGreaterThan(0)
+    expect(fixture.result.frontier.length).toBeGreaterThan(0)
+  })
+
+  it('draws both trees from that one solve, so they cannot disagree', () => {
+    resetEnumerationCallCountForTest()
+    buildWorldsTreeModel(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'probability')
+    buildWorldsTreeModel(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'eig')
+
+    expect(getEnumerationCallCountForTest()).toBe(0)
+  })
+
+  it('quotes the solver its own numbers, not numbers derived a second way', () => {
+    const model = buildWorldsTreeModel(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'probability')
+    expect(model.focusProbability).toBe(focusResult.probability)
+    expect(model.focusEig).toBe(focusResult.eig)
+    expect(model.totalEntropyBits).toBe(result.totalEntropyBits)
+  })
+})
+
+describe('worlds-tree probability mode', () => {
+  const model = buildWorldsTreeModel(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'probability')
+  const svg = renderWorldsTree(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'probability')
 
   it('branches over every frontier cell, rooted at the focus cell', () => {
     expect(model.cellOrder.length).toBe(5)
@@ -52,7 +87,7 @@ describe('worlds-tree probability mode (3.1)', () => {
   it('cuts each dead branch at the depth the clues rule it out', () => {
     // A drawn tip is either a full assignment or the shallowest dead prefix: its parent must
     // still have had a consistent completion, or the cut belonged further up.
-    const worlds = enumerateWeightedWorlds(WORLDS_TREE_BOARD).worlds
+    const worlds = worldsTreeFixture.worlds
     const completions = (path: readonly (0 | 1)[]) =>
       worlds.filter((w) => path.every((v, i) => w.assignment.get(`${model.cellOrder[i].row},${model.cellOrder[i].col}`) === v)).length
 
@@ -92,9 +127,9 @@ describe('worlds-tree probability mode (3.1)', () => {
   })
 })
 
-describe('worlds-tree EIG mode (3.2)', () => {
-  const model = buildWorldsTreeModel(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'eig')
-  const svg = renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'eig')
+describe('worlds-tree EIG mode', () => {
+  const model = buildWorldsTreeModel(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'eig')
+  const svg = renderWorldsTree(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, 'eig')
 
   it('branches the focus cell first so its outcomes are the top-level split', () => {
     expect(`${model.cellOrder[0].row},${model.cellOrder[0].col}`).toBe(focusKey)
@@ -141,7 +176,7 @@ describe.each([
   ['probability' as const],
   ['eig' as const],
 ])('worlds-tree %s mode fits its canvas', (mode) => {
-  const svg = renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, mode)
+  const svg = renderWorldsTree(worldsTreeFixture, WORLDS_TREE_FOCUS_CELL, mode)
   const [width, height] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/)!.slice(1).map(Number)
 
   it('starts every text run inside the canvas', () => {

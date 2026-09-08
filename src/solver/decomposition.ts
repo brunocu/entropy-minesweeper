@@ -1,7 +1,8 @@
 // Board decomposition: which unrevealed cells are on the frontier, what the revealed numbers
 // constrain, what Tier 0 alone can settle, and how the frontier splits into independent
-// components. See openspec/changes/entropy-minesweeper/specs/frontier-solver/spec.md.
+// components.
 
+import { incrementDecompositionCallCount } from './instrumentation.ts'
 import { key, type Coord, type SolverBoard, type SolverCell } from './types.ts'
 
 export function isNumbered(cell: SolverCell): boolean {
@@ -21,7 +22,7 @@ export function neighbors(board: SolverBoard, row: number, col: number): Coord[]
   return result
 }
 
-/** 3.1 Frontier identification: unrevealed cells adjacent to a revealed numbered cell. */
+/** Frontier identification: unrevealed cells adjacent to a revealed numbered cell. */
 export function identifyFrontier(board: SolverBoard): Coord[] {
   const seen = new Set<string>()
   const result: Coord[] = []
@@ -73,10 +74,10 @@ interface TrivialDeductionResult {
 }
 
 /**
- * 3.2 Tier 0 trivial deduction, applied iteratively until no more cells can be resolved.
- * `seedForcedSafe`/`seedForcedMine` (design.md Decision 5, step 3) seed the accumulators
- * with facts already known true from elsewhere (e.g. a flagged-and-globally-forced cell)
- * before the fixpoint loop runs, rather than adding a new "given" constraint type.
+ * Tier 0 trivial deduction, applied iteratively until no more cells can be resolved.
+ * `seedForcedSafe`/`seedForcedMine` seed the accumulators with facts already known true from
+ * elsewhere (e.g. a flagged-and-globally-forced cell) before the fixpoint loop runs, rather
+ * than adding a new "given" constraint type.
  */
 export function applyTrivialDeduction(
   constraints: readonly RawConstraint[],
@@ -156,7 +157,7 @@ class UnionFind {
   }
 }
 
-/** 3.3 Partition the frontier into connected components via shared numbered neighbors. */
+/** Partition the frontier into connected components via shared numbered neighbors. */
 export function computeComponents(
   frontierKeys: string[],
   constraints: readonly RawConstraint[],
@@ -183,4 +184,88 @@ export function computeFrontierComponents(board: SolverBoard): Coord[][] {
   const constraints = buildConstraints(board)
   const components = computeComponents(frontierKeys, constraints)
   return [...components.values()].map((cells) => cells.map((k) => coordByKey.get(k)!))
+}
+
+/** One frontier component, with the clues that constrain it already sliced out of the board's. */
+export interface ComponentSlice {
+  readonly cells: readonly string[]
+  /** The constraints touching this component, in `constraints` order. */
+  readonly relevantConstraints: readonly RawConstraint[]
+}
+
+/**
+ * Everything `solve` and `computeExplanations` both need from a board before either starts
+ * enumerating: which cells are on the frontier, what the revealed numbers constrain, and how
+ * that frontier splits into independent components with their own clues.
+ *
+ * `GameController` runs both consumers against the same board every move, so this is a value the
+ * two share rather than something each derives for itself.
+ *
+ * Deliberately holds nothing flag-dependent. `solve` has no access to flags and signs its
+ * components with the empty set; `computeExplanations` signs with the real flagged set. Two
+ * boards differing only in a flag are required to solve identically, which holds precisely
+ * because the shared part cannot see flags - so the per-component signature stays with each
+ * consumer and there is no flag field here to pass one in.
+ */
+export interface Decomposition {
+  /** The board this was derived from, carried so a caller cannot pair it with a different one. */
+  readonly board: SolverBoard
+  readonly frontierCoords: readonly Coord[]
+  readonly frontierKeys: readonly string[]
+  readonly frontierSet: ReadonlySet<string>
+  readonly frontierCoordByKey: ReadonlyMap<string, Coord>
+  readonly constraints: readonly RawConstraint[]
+  readonly componentSlices: readonly ComponentSlice[]
+  /** Unrevealed cells that no revealed number touches - the pooled remainder. */
+  readonly nonFrontierCells: readonly Coord[]
+  readonly numberedCoordByKey: ReadonlyMap<string, Coord>
+}
+
+export function decompose(board: SolverBoard): Decomposition {
+  incrementDecompositionCallCount()
+  const frontierCoords = identifyFrontier(board)
+  const frontierKeys = frontierCoords.map((c) => key(c.row, c.col))
+  const frontierSet = new Set(frontierKeys)
+  const frontierCoordByKey = new Map(frontierCoords.map((c, i) => [frontierKeys[i], c]))
+
+  const constraints = buildConstraints(board)
+  const components = computeComponents(frontierKeys, constraints)
+
+  // Every cell of a constraint is an unrevealed neighbor of the same numbered cell, and
+  // `computeComponents` unions them all together - so a constraint lies wholly inside one
+  // component and its first cell names which. That makes slicing one pass over the constraints
+  // rather than a scan of all of them per component.
+  const sliceByRoot = new Map<string, { cells: readonly string[]; relevantConstraints: RawConstraint[] }>()
+  const rootByCell = new Map<string, string>()
+  for (const [root, cells] of components) {
+    sliceByRoot.set(root, { cells, relevantConstraints: [] })
+    for (const cellKey of cells) rootByCell.set(cellKey, root)
+  }
+  for (const constraint of constraints) {
+    const root = rootByCell.get(constraint.cells[0])
+    if (root !== undefined) sliceByRoot.get(root)!.relevantConstraints.push(constraint)
+  }
+
+  const nonFrontierCells: Coord[] = []
+  const numberedCoordByKey = new Map<string, Coord>()
+  for (let row = 0; row < board.height; row++) {
+    for (let col = 0; col < board.width; col++) {
+      const cell = board.cells[row][col]
+      if (isNumbered(cell)) numberedCoordByKey.set(key(row, col), { row, col })
+      if (cell.revealed) continue
+      if (!frontierSet.has(key(row, col))) nonFrontierCells.push({ row, col })
+    }
+  }
+
+  return {
+    board,
+    frontierCoords,
+    frontierKeys,
+    frontierSet,
+    frontierCoordByKey,
+    constraints,
+    componentSlices: [...sliceByRoot.values()],
+    nonFrontierCells,
+    numberedCoordByKey,
+  }
 }

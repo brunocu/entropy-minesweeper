@@ -1,5 +1,6 @@
 import { Board } from '../board/board.ts'
 import type { ComponentCache } from '../solver/componentEnumeration.ts'
+import { decompose, type Decomposition } from '../solver/decomposition.ts'
 import { computeExplanations, type FrontierExplanation } from '../solver/explanation.ts'
 import { solve, type SolveWithCache } from '../solver/probability.ts'
 import type { SolveResult } from '../solver/types.ts'
@@ -14,7 +15,7 @@ function flaggedCellKeys(board: Board): Set<string> {
   return result
 }
 
-export type Solve = (board: Board, cache: ComponentCache) => SolveWithCache
+export type Solve = (decomposition: Decomposition, cache: ComponentCache) => SolveWithCache
 
 export interface UncertaintyHistoryEntry {
   readonly moveIndex: number
@@ -32,39 +33,56 @@ export class GameController {
   latestExplanations: ReadonlyMap<string, FrontierExplanation>
   uncertaintyHistory: readonly UncertaintyHistoryEntry[]
   private readonly solveFn: Solve
+  /**
+   * The decomposition `latestSolve` was computed from. Held rather than rebuilt because the
+   * decomposition reads only revealed cells and their counts, so a flag toggle cannot invalidate
+   * it - which is what lets `toggleFlag` re-explain without redoing the whole phase.
+   */
+  private latestDecomposition: Decomposition
   private componentCache: ComponentCache = new Map()
   private nextMoveIndex = 0
 
   constructor(board: Board, solveFn: Solve = solve) {
     this.board = board
     this.solveFn = solveFn
-    const { result, cache } = this.solveFn(this.board, this.componentCache)
+    this.latestDecomposition = decompose(this.board)
+    const { result, cache } = this.solveFn(this.latestDecomposition, this.componentCache)
     this.latestSolve = result
     this.componentCache = cache
-    const explained = computeExplanations(this.board, this.latestSolve, flaggedCellKeys(this.board), this.componentCache)
-    this.latestExplanations = explained.explanations
-    this.componentCache = explained.cache
+    this.latestExplanations = this.explain()
     this.uncertaintyHistory = [{ moveIndex: this.nextMoveIndex++, totalEntropyBits: this.latestSolve.totalEntropyBits }]
   }
 
   reveal(row: number, col: number, rng?: () => number): boolean {
     const changed = this.board.reveal(row, col, rng)
     if (!changed) return false
-    const { result, cache } = this.solveFn(this.board, this.componentCache)
+    // One decomposition of the settled board, shared by both consumers of it.
+    this.latestDecomposition = decompose(this.board)
+    const { result, cache } = this.solveFn(this.latestDecomposition, this.componentCache)
     this.latestSolve = result
     this.componentCache = cache
-    const explained = computeExplanations(this.board, this.latestSolve, flaggedCellKeys(this.board), this.componentCache)
-    this.latestExplanations = explained.explanations
-    this.componentCache = explained.cache
+    this.latestExplanations = this.explain()
     this.recordMove()
     return true
   }
 
-  toggleFlag(row: number, col: number): void {
-    this.board.toggleFlag(row, col)
-    const explained = computeExplanations(this.board, this.latestSolve, flaggedCellKeys(this.board), this.componentCache)
-    this.latestExplanations = explained.explanations
+  /** Reports whether the flag actually moved, so a caller can skip work when it did not. */
+  toggleFlag(row: number, col: number): boolean {
+    const changed = this.board.toggleFlag(row, col)
+    this.latestExplanations = this.explain()
+    return changed
+  }
+
+  /** Re-derives explanations for the current flags, against the standing solve and decomposition. */
+  private explain(): ReadonlyMap<string, FrontierExplanation> {
+    const explained = computeExplanations(
+      this.latestDecomposition,
+      this.latestSolve,
+      flaggedCellKeys(this.board),
+      this.componentCache,
+    )
     this.componentCache = explained.cache
+    return explained.explanations
   }
 
   private recordMove(): void {

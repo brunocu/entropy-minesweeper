@@ -3,7 +3,7 @@ import { UNCERTAINTY_CLIFF_MOVE, UNCERTAINTY_FLAT_SPAN, UNCERTAINTY_TRACE } from
 import { UNCERTAINTY_ANNOTATIONS } from '../illustrations.ts'
 import { renderUncertaintyChart } from '../uncertaintyChartSvg.ts'
 
-describe('uncertainty-chart generator (3.4)', () => {
+describe('uncertainty-chart generator', () => {
   const svg = renderUncertaintyChart(UNCERTAINTY_TRACE, UNCERTAINTY_ANNOTATIONS)
 
   it('plots the whole trace as one polyline with a point per move', () => {

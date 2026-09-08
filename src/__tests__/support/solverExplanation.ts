@@ -1,7 +1,6 @@
 // Test-only adaptation between board coordinates and the explanation pipeline's internals:
 // build a `ComponentIndex` from a board, call the real internal, map the string keys back to
-// `Coord`s. These wrappers used to live in the solver's old monolith as `*ForTest` exports; per
-// split-solver-modules design.md D3 the adaptation is a test's own business, so it moved here
+// `Coord`s. The adaptation is a test's own business, so it lives here rather than in the solver,
 // while the internals it calls stay exactly the shipped ones.
 
 import { buildConstraints, type RawConstraint } from '../../solver/decomposition.ts'
@@ -70,8 +69,8 @@ export function countLayersPulledForTest(board: SolverBoard, x: Coord, targetVal
 }
 
 /**
- * View of a `ComponentIndex`'s `cluesByCell` map (reduce-explanation-setup-overhead
- * D2): the on-demand adjacency's whole substrate, exposed so a hand-checked board can pin it.
+ * View of a `ComponentIndex`'s `cluesByCell` map: the on-demand adjacency's whole substrate,
+ * exposed so a hand-checked board can pin it.
  */
 export function computeCluesByCellForTest(board: SolverBoard): Map<string, Coord[]> {
   const index = buildComponentIndex(buildConstraints(board), NO_FLAG_GIVENS)
@@ -98,8 +97,8 @@ export function computeClueBfsLayersForComponent(
 }
 
 /**
- * View of a frontier component's real (untrimmed) forced-mine/forced-safe sets
- * (design.md Decision 5, step 1), exposed the same way computeFrontierComponents is.
+ * View of a frontier component's real (untrimmed) forced-mine/forced-safe sets, exposed the
+ * same way computeFrontierComponents is.
  */
 export function computeComponentForcedSets(
   board: SolverBoard,

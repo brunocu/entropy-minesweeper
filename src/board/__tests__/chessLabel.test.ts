@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { toLabel } from '../chessLabel.ts'
 
-describe('chess-style cell addressing (1.1)', () => {
+describe('chess-style cell addressing', () => {
   it('labels the top-left cell A1', () => {
     expect(toLabel(0, 0)).toBe('A1')
   })

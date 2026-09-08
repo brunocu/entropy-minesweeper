@@ -1,9 +1,9 @@
-// Canvas2D board renderer (design.md decision 2): one surface, a flat draw loop that
+// Canvas2D board renderer: one surface, a flat draw loop that
 // redraws cell fills every board-state change. No per-cell DOM nodes, no framework.
 import { toLabel } from '../board/chessLabel.ts'
 import { CLUE_HIGHLIGHT_COLOR, eigGradientColor, PREMISE_HIGHLIGHT_COLOR, probabilityColor } from './probabilityColor.ts'
 
-/** Certainty-explanation highlight role for a cell (frontier-certainty-explanation), or none. */
+/** Certainty-explanation highlight role for a cell, or none. */
 export type HighlightRole = 'clue' | 'premise' | null
 
 export interface RenderCell {
@@ -56,7 +56,7 @@ export class BoardRenderer {
 
     // First pass: collect the max EIG among unrevealed, unflagged, certain-safe (p=0) frontier
     // cells to normalize the EIG-gradient fill's high end against this render's own range; the
-    // low end is always 0, not this render's minimum (design.md decision 1, revised).
+    // low end is always 0, not this render's minimum.
     let maxEig: number | null = null
     for (let row = 0; row < board.height; row++) {
       for (let col = 0; col < board.width; col++) {
@@ -113,7 +113,7 @@ export class BoardRenderer {
           ctx.fill()
         }
 
-        // Certainty-explanation highlight (design.md decision 5): a second, further-inset
+        // Certainty-explanation highlight: a second, further-inset
         // additive stroke layered on top of everything above (including the certainty ring),
         // never replacing a cell's existing fill/marker state.
         if (cell.highlightRole !== null) {

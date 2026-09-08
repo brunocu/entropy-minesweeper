@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeFrontierComponents } from '../decomposition.ts'
+import { computeFrontierComponents, decompose } from '../decomposition.ts'
 import { computeComponentSignature } from '../componentEnumeration.ts'
 import { computeExplanations } from '../explanation.ts'
 import {
@@ -11,7 +11,7 @@ import {
 import { solve } from '../probability.ts'
 import { makeBoard } from '../../__tests__/support/makeBoard.ts'
 
-describe('component cache signature (1.2)', () => {
+describe('component cache signature', () => {
   it('is identical regardless of constraint/flag insertion order, and changes when any input changes', () => {
     const board = makeBoard(['121', '???'], 2)
     const components = computeFrontierComponents(board)
@@ -33,71 +33,75 @@ describe('component cache signature (1.2)', () => {
   })
 })
 
-describe('solve component cache (2.4)', () => {
+describe('solve component cache', () => {
   it('reuses cached enumeration across an unchanged board, and only re-enumerates a changed component', () => {
     // Two disjoint single-cell components: (0,1) under clue (0,0), (0,2) under clue (0,3).
     const board = makeBoard(['1??1'], 2)
     const changedBoard = makeBoard(['2??1'], 2) // only the left clue's requiredMines changes
 
     resetEnumerationCallCountForTest()
-    const first = solve(board, new Map())
+    const first = solve(decompose(board), new Map())
     expect(getEnumerationCallCountForTest()).toBe(2) // one enumeration per component, first time
 
     resetEnumerationCallCountForTest()
-    solve(board, first.cache)
+    solve(decompose(board), first.cache)
     expect(getEnumerationCallCountForTest()).toBe(0) // unchanged board: both components hit cache
 
     resetEnumerationCallCountForTest()
-    solve(changedBoard, first.cache)
+    solve(decompose(changedBoard), first.cache)
     expect(getEnumerationCallCountForTest()).toBe(1) // only the changed component re-enumerates
   })
 })
 
-describe('computeExplanations component cache (3.2, 3.3)', () => {
+describe('computeExplanations component cache', () => {
   it('reuses a solve-produced cache: performs zero fresh top-level enumeration for components solve already populated', () => {
     const board = makeBoard(['121', '???'], 2)
-    const { result, cache: solveCache } = solve(board, new Map())
+    const decomposition = decompose(board)
+    const { result, cache: solveCache } = solve(decomposition, new Map())
 
     resetEnumerationCallCountForTest()
-    computeExplanations(board, result, new Set(), solveCache)
+    computeExplanations(decomposition, result, new Set(), solveCache)
     expect(getEnumerationCallCountForTest()).toBe(0)
   })
 
   it('reuses cached explanations across repeated calls: no new grow/trim search on the second call', () => {
     const board = makeBoard(['121', '???'], 2)
-    const { result, cache: solveCache } = solve(board, new Map())
+    const decomposition = decompose(board)
+    const { result, cache: solveCache } = solve(decomposition, new Map())
 
     resetGrowTrimCallCountForTest()
-    const first = computeExplanations(board, result, new Set(), solveCache)
+    const first = computeExplanations(decomposition, result, new Set(), solveCache)
     expect(getGrowTrimCallCountForTest()).toBeGreaterThan(0) // first call actually runs grow/trim
 
     resetGrowTrimCallCountForTest()
-    const second = computeExplanations(board, result, new Set(), first.cache)
+    const second = computeExplanations(decomposition, result, new Set(), first.cache)
     expect(getGrowTrimCallCountForTest()).toBe(0)
     expect(second.explanations).toEqual(first.explanations)
   })
 })
 
-describe('toggleFlag-shaped cache reuse (3.4, 3.5)', () => {
+describe('toggleFlag-shaped cache reuse', () => {
   // Two disjoint components: A={(0,1),(1,0),(1,1)} under clue (0,0), B={(0,3),(1,3),(1,4)} under
   // clue (0,4). (0,2)/(1,2) are non-frontier (not adjacent to any revealed numbered cell).
   const board = makeBoard(['1???1', '?????'], 2)
 
   it('is a full cache hit when the toggled cell is outside every frontier component', () => {
-    const result = solve(board, new Map()).result
-    const before = computeExplanations(board, result, new Set(), new Map())
+    const decomposition = decompose(board)
+    const result = solve(decomposition, new Map()).result
+    const before = computeExplanations(decomposition, result, new Set(), new Map())
 
-    const after = computeExplanations(board, result, new Set(['0,2']), before.cache)
+    const after = computeExplanations(decomposition, result, new Set(['0,2']), before.cache)
 
     expect(after.cache).toEqual(before.cache)
     expect(after.explanations).toEqual(before.explanations)
   })
 
   it('recomputes only the component containing a toggled frontier cell, carrying other components over unchanged', () => {
-    const result = solve(board, new Map()).result
-    const before = computeExplanations(board, result, new Set(), new Map())
+    const decomposition = decompose(board)
+    const result = solve(decomposition, new Map()).result
+    const before = computeExplanations(decomposition, result, new Set(), new Map())
 
-    const after = computeExplanations(board, result, new Set(['0,1']), before.cache) // (0,1) is in component A
+    const after = computeExplanations(decomposition, result, new Set(['0,1']), before.cache) // (0,1) is in component A
 
     expect(after.cache.size).toBe(before.cache.size)
     const beforeKeys = new Set(before.cache.keys())
@@ -115,19 +119,21 @@ describe('toggleFlag-shaped cache reuse (3.4, 3.5)', () => {
   })
 })
 
-describe('component cache pruning (3.6)', () => {
+describe('component cache pruning', () => {
   it('drops a component signature from the cache once a board change removes that component', () => {
     const board = makeBoard(['1???1', '?????'], 2)
     // Component A's own frontier cells are all revealed away, eliminating it; component B (under
     // clue (0,4)) is untouched, so its signature carries over identically.
     const changedBoard = makeBoard(['1.??1', '..???'], 2)
 
-    const firstResult = solve(board, new Map()).result
-    const first = computeExplanations(board, firstResult, new Set(), new Map())
+    const firstDecomposition = decompose(board)
+    const firstResult = solve(firstDecomposition, new Map()).result
+    const first = computeExplanations(firstDecomposition, firstResult, new Set(), new Map())
     expect(first.cache.size).toBe(2)
 
-    const secondResult = solve(changedBoard, new Map()).result
-    const second = computeExplanations(changedBoard, secondResult, new Set(), first.cache)
+    const secondDecomposition = decompose(changedBoard)
+    const secondResult = solve(secondDecomposition, new Map()).result
+    const second = computeExplanations(secondDecomposition, secondResult, new Set(), first.cache)
 
     expect(second.cache.size).toBe(1)
     const firstKeys = [...first.cache.keys()]

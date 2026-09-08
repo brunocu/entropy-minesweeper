@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { pixelToCell } from '../hitTest.ts'
 
-describe('grid-coordinate hit-testing (5.4)', () => {
+describe('grid-coordinate hit-testing', () => {
   it('maps known pixel coordinates to the expected row/column', () => {
     const cellSize = 32
     const width = 10

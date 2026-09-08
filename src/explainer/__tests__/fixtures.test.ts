@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toLabel } from '../../board/chessLabel.ts'
+import { decompose } from '../../solver/decomposition.ts'
 import { computeExplanations } from '../../solver/explanation.ts'
 import { solve } from '../../solver/probability.ts'
 import type { SolveResult } from '../../solver/types.ts'
@@ -30,8 +31,9 @@ describe('trivial-deduction fixture', () => {
   // The introduction claims this board is the one-clue-at-a-time deduction: A3's `1` names A2
   // outright, and A2 as a premise makes A1 safe. If the fixture ever stops saying that, the
   // article's opening is telling a story about a picture that no longer shows it.
-  const { result } = solve(TRIVIAL_BOARD, new Map())
-  const { explanations } = computeExplanations(TRIVIAL_BOARD, result, new Set(), new Map())
+  const decomposition = decompose(TRIVIAL_BOARD)
+  const { result } = solve(decomposition, new Map())
+  const { explanations } = computeExplanations(decomposition, result, new Set(), new Map())
 
   it('forces the focus cell to be a mine and the cell above it to be safe', () => {
     expect(frontierAt(result, TRIVIAL_FOCUS_CELL.row, TRIVIAL_FOCUS_CELL.col).probability).toBe(1)
@@ -50,8 +52,8 @@ describe('trivial-deduction fixture', () => {
   })
 })
 
-describe('worlds-tree fixture (1.1)', () => {
-  const { result } = solve(WORLDS_TREE_BOARD, new Map())
+describe('worlds-tree fixture', () => {
+  const { result } = solve(decompose(WORLDS_TREE_BOARD), new Map())
 
   it('solves without error, every frontier cell getting a real probability', () => {
     expect(result.frontier.length).toBe(5)
@@ -97,9 +99,10 @@ describe('worlds-tree fixture (1.1)', () => {
   })
 })
 
-describe('certainty-explanation fixture (1.2)', () => {
-  const { result } = solve(CERTAINTY_BOARD, new Map())
-  const { explanations } = computeExplanations(CERTAINTY_BOARD, result, new Set(), new Map())
+describe('certainty-explanation fixture', () => {
+  const decomposition = decompose(CERTAINTY_BOARD)
+  const { result } = solve(decomposition, new Map())
+  const { explanations } = computeExplanations(decomposition, result, new Set(), new Map())
   const focusKey = `${CERTAINTY_FOCUS_CELL.row},${CERTAINTY_FOCUS_CELL.col}`
 
   it('makes the focus cell certainly safe', () => {
@@ -186,7 +189,7 @@ describe('fixture boards carry no dead space', () => {
   }
 })
 
-describe('uncertainty-chart trace (1.3)', () => {
+describe('uncertainty-chart trace', () => {
   const drops = UNCERTAINTY_TRACE.slice(1).map(
     (point, i) => UNCERTAINTY_TRACE[i].totalEntropyBits - point.totalEntropyBits,
   )

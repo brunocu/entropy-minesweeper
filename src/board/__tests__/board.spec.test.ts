@@ -1,10 +1,9 @@
-// Traces 1:1 to the scenarios in
-// openspec/changes/entropy-minesweeper/specs/minesweeper-board/spec.md
+// Traces 1:1 to the scenarios in openspec/specs/minesweeper-board/spec.md
 import { describe, expect, it } from 'vitest'
 import { Board } from '../board.ts'
 import { boardFromMineLayout } from '../../__tests__/support/boardFactory.ts'
 
-describe('minesweeper-board spec scenarios (2.7)', () => {
+describe('minesweeper-board spec scenarios', () => {
   it('New board has correct mine count', () => {
     const board = new Board(6, 6, 8)
     board.reveal(0, 0)

@@ -1,14 +1,13 @@
-import type { SolveResult } from '../solver/types.ts'
+import { key, type SolveResult } from '../solver/types.ts'
 
 export interface RevealFeedback {
   readonly predictedEig: number | null
   readonly revealedInformation: number
 }
 
-/** EIG readout for an inspected cell: only frontier cells have one (6.1). */
+/** EIG readout for an inspected cell: only frontier cells have one. */
 export function findFrontierEig(solveResult: SolveResult, row: number, col: number): number | null {
-  const frontierResult = solveResult.frontier.find((f) => f.row === row && f.col === col)
-  return frontierResult ? frontierResult.eig : null
+  return solveResult.frontierByKey.get(key(row, col))?.eig ?? null
 }
 
 /**
@@ -23,9 +22,8 @@ export function computeRevealFeedback(
   row: number,
   col: number,
 ): RevealFeedback {
-  const frontierResult = preRevealSolve.frontier.find((f) => f.row === row && f.col === col)
   return {
-    predictedEig: frontierResult ? frontierResult.eig : null,
+    predictedEig: preRevealSolve.frontierByKey.get(key(row, col))?.eig ?? null,
     revealedInformation: preRevealSolve.totalEntropyBits - postRevealSolve.totalEntropyBits,
   }
 }

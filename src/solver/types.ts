@@ -1,6 +1,5 @@
 // The shared vocabulary of the frontier solver: the board it reads, the coordinates it
 // reports, and the `row,col` string key convention every other solver module speaks.
-// See openspec/changes/entropy-minesweeper/specs/frontier-solver/spec.md and design.md.
 
 export interface SolverCell {
   readonly revealed: boolean
@@ -28,7 +27,10 @@ export interface FrontierCellResult extends Coord {
 }
 
 export interface SolveResult {
+  /** Frontier cells in enumeration order - the weighted worlds and the worlds tree depend on it. */
   readonly frontier: readonly FrontierCellResult[]
+  /** The same entries indexed by `key(row, col)`, built once here so consumers do not scan `frontier`. */
+  readonly frontierByKey: ReadonlyMap<string, FrontierCellResult>
   readonly nonFrontierProbability: number | null
   readonly nonFrontierCells: readonly Coord[]
   readonly totalEntropyBits: number

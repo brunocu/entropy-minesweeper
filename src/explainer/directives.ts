@@ -1,4 +1,4 @@
-// Maps the article's six `remark-directive` names to their hast output (design.md decision 2).
+// Maps the article's six `remark-directive` names to their hast output.
 // `remark-directive` only parses `:::`/`::`/`:` syntax into generic directive nodes - "directives
 // don't handle themselves" per its own README - so this plugin is the part that says what HTML
 // each one becomes. Anything outside these six names throws: a typo in `explainer.md` should fail
@@ -51,7 +51,7 @@ export const remarkExplainerDirectives: Plugin<[], MdastRoot> = () => (tree) => 
   })
 }
 
-/** Strips the title element `remark-github-markdown-alerts` always renders (design.md decision
+/** Strips the title element `remark-github-markdown-alerts` always renders (decision
  * 2: its `tags`/`classNames` options rename the title node but never omit it - confirmed against
  * the installed package's source, which unconditionally builds a title element). Runs on the hast
  * tree, after the alert's raw HTML has been parsed back in by `rehype-raw`. */

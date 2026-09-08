@@ -1,10 +1,11 @@
-// Build-time SVG generator for the explainer's worlds-tree illustrations (design.md
-// decisions 4 and 5). One generator, two modes, one fixed toy scenario: probability mode
-// highlights the surviving branches where the focus cell is a mine, EIG mode groups the same
-// surviving branches by what revealing that cell would show.
+// Build-time SVG generator for the explainer's worlds-tree illustrations. One generator, two
+// modes, one fixed toy scenario: probability mode highlights the surviving branches where the
+// focus cell is a mine, EIG mode groups the same surviving branches by what revealing that
+// cell would show.
 //
-// Both modes read the same `enumerateWeightedWorlds` output the real solver derives its
-// probabilities and EIG from, so the picture cannot disagree with the numbers.
+// Both modes read the same `solve` output the real solver derives its probabilities and EIG
+// from - the worlds and the numbers come back from one call - so the picture cannot disagree
+// with the numbers.
 //
 // The tree is pruned, not complete: a branch stops at the depth where the clues rule it out,
 // rather than fanning out to 2^n leaves most of which are dead. That is also how the solver
@@ -12,8 +13,9 @@
 // consistent - so the drawing shows the search that actually runs.
 import { toLabel } from '../board/chessLabel.ts'
 import { EIG_HIGH_COLOR, MINE_POLE_COLOR, SAFE_POLE_COLOR } from '../render/probabilityColor.ts'
-import { enumerateWeightedWorlds, outcomeKey, solve, type WeightedWorld } from '../solver/probability.ts'
+import { outcomeKey, type WeightedWorld } from '../solver/probability.ts'
 import type { Coord, SolverBoard } from '../solver/types.ts'
+import type { SolvedFixture } from './solvedFixture.ts'
 
 export type WorldsTreeMode = 'probability' | 'eig'
 
@@ -160,10 +162,14 @@ interface BuiltTree {
  * The data behind either illustration: the pruned branching structure, where the clues cut each
  * dead branch off, and what survives, plus the laid-out node tree the drawing walks.
  */
-function buildTree(board: SolverBoard, focusCell: Coord, mode: WorldsTreeMode): BuiltTree {
-  const { frontierCells, worlds } = enumerateWeightedWorlds(board)
-  const { result } = solve(board, new Map())
-  const focus = result.frontier.find((f) => f.row === focusCell.row && f.col === focusCell.col)
+function buildTree(fixture: SolvedFixture, focusCell: Coord, mode: WorldsTreeMode): BuiltTree {
+  // One enumeration for both halves of the picture: the branches come from `worlds`, the numbers
+  // quoted beside them from `result`. Both arrive already solved, so the two trees drawn from
+  // this fixture cannot disagree with each other.
+  const { board, result, worlds } = fixture
+  // Frontier order is the solver's own enumeration order - the demo's branching order.
+  const frontierCells = result.frontier
+  const focus = result.frontierByKey.get(key(focusCell))
   if (!focus) throw new Error(`focus cell ${toLabel(focusCell.row, focusCell.col)} is not a frontier cell`)
 
   // The focus cell is always the root. In EIG mode that makes the outcome being grouped the
@@ -253,8 +259,8 @@ function buildTree(board: SolverBoard, focusCell: Coord, mode: WorldsTreeMode): 
 }
 
 /** The illustration's underlying numbers, so they can be checked against the solver directly. */
-export function buildWorldsTreeModel(board: SolverBoard, focusCell: Coord, mode: WorldsTreeMode): WorldsTreeModel {
-  return buildTree(board, focusCell, mode).model
+export function buildWorldsTreeModel(fixture: SolvedFixture, focusCell: Coord, mode: WorldsTreeMode): WorldsTreeModel {
+  return buildTree(fixture, focusCell, mode).model
 }
 
 // --- Drawing ---
@@ -286,8 +292,8 @@ function describeOutcome(outcome: string): string {
 }
 
 /** Renders one mode's illustration as standalone inline SVG markup. */
-export function renderWorldsTree(board: SolverBoard, focusCell: Coord, mode: WorldsTreeMode): string {
-  const { model, root } = buildTree(board, focusCell, mode)
+export function renderWorldsTree(fixture: SolvedFixture, focusCell: Coord, mode: WorldsTreeMode): string {
+  const { model, root } = buildTree(fixture, focusCell, mode)
 
   const nodeX = (node: LayoutNode): number => MARGIN_LEFT + node.path.length * COLUMN_WIDTH
   const nodeY = (node: LayoutNode): number => MARGIN_TOP + (node.y + 0.5) * ROW_HEIGHT

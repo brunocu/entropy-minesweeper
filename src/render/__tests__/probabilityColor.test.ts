@@ -9,7 +9,7 @@ import {
   probabilityColor,
 } from '../probabilityColor.ts'
 
-describe('p -> color mapping (5.2)', () => {
+describe('p -> color mapping', () => {
   it('maps p=0 and p=1 to visually distinct pole colors', () => {
     expect(probabilityColor(0)).toBe(SAFE_POLE_COLOR)
     expect(probabilityColor(1)).toBe(MINE_POLE_COLOR)
@@ -32,7 +32,7 @@ describe('p -> color mapping (5.2)', () => {
   })
 })
 
-describe('eig -> color mapping (revise-eig-visualization 1.1)', () => {
+describe('eig -> color mapping', () => {
   it('maps low-EIG and high-EIG inputs to visually-ordered, distinct colors', () => {
     const low = eigGradientColor(0, 1)
     const mid = eigGradientColor(0.5, 1)

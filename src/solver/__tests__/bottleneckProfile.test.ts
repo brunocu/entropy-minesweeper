@@ -1,6 +1,6 @@
 import { describe, it } from 'vitest'
 import { Board } from '../../board/board.ts'
-import { computeFrontierComponents, computeTrivialDeductions } from '../decomposition.ts'
+import { computeFrontierComponents, computeTrivialDeductions, decompose } from '../decomposition.ts'
 import type { ComponentCache } from '../componentEnumeration.ts'
 import { computeExplanations } from '../explanation.ts'
 import {
@@ -11,7 +11,7 @@ import {
   resetGrowTrimCallCountForTest,
   resetSubsetKeyCallCountForTest,
 } from '../instrumentation.ts'
-import { enumerateWeightedWorlds, solve } from '../probability.ts'
+import { solve } from '../probability.ts'
 import type { SolveResult, SolverBoard } from '../types.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
 import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
@@ -49,7 +49,6 @@ const DIFFICULTIES: readonly Difficulty[] = [
 ]
 
 const SAFE_FREE_VAR_CAP = 22
-const WORLDS_PROBE_THRESHOLD_MS = 20
 const MAX_MOVES_PER_GAME = 200
 const SEEDS_PER_DIFFICULTY = 20
 
@@ -166,23 +165,25 @@ function playGame(difficulty: Difficulty, seed: number, records: MoveRecord[]): 
       resetGrowTrimCallCountForTest()
       resetSubsetKeyCallCountForTest()
 
+      // One decomposition shared by both, as GameController does it - so the two phases below
+      // are timed for their own work, not for a board decomposition each.
+      const decomposition = decompose(solverBoard)
       const solveStart = performance.now()
-      const solved = solve(solverBoard, cache)
+      const solved = solve(decomposition, cache)
       solveMs = performance.now() - solveStart
       lastSolveResult = solved.result
       cache = solved.cache
       enumerationDelta = getEnumerationCallCountForTest()
 
       const explainStart = performance.now()
-      const explained = computeExplanations(solverBoard, solved.result, new Set(), cache)
+      const explained = computeExplanations(decomposition, solved.result, new Set(), cache)
       explainMs = performance.now() - explainStart
       cache = explained.cache
       growTrimDelta = getGrowTrimCallCountForTest()
       subsetKeyDelta = getSubsetKeyCallCountForTest()
 
-      if (solveMs > WORLDS_PROBE_THRESHOLD_MS) {
-        survivingWorlds = enumerateWeightedWorlds(solverBoard).worlds.length
-      }
+      // Free: `solve` already reports the worlds it aggregated over.
+      survivingWorlds = solved.worlds.length
       ;[row, col] = pickInformedMove(solved.result, rng)
     }
 

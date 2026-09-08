@@ -67,7 +67,7 @@ function boardOf(cells: RenderCell[]): RenderBoard {
   return { width: cells.length, height: 1, cells: [cells] }
 }
 
-describe('BoardRenderer certain-safe frontier EIG-gradient fill (2.3)', () => {
+describe('BoardRenderer certain-safe frontier EIG-gradient fill', () => {
   it('gives two certain-safe frontier cells with different EIG different fills', () => {
     const { canvas, fillStyles } = makeFakeCanvas()
     const renderer = new BoardRenderer(canvas, { cellSize: 10 })
@@ -95,7 +95,7 @@ describe('BoardRenderer certain-safe frontier EIG-gradient fill (2.3)', () => {
   })
 })
 
-describe('certainty-explanation highlight (4.2, 4.3)', () => {
+describe('certainty-explanation highlight', () => {
   it("draws a highlighted premise cell's existing certainty-ring/fill markup alongside the new stroke", () => {
     const { canvas, fillStyles, strokeRects } = makeFakeCanvas()
     const renderer = new BoardRenderer(canvas, { cellSize: 10 })
@@ -137,7 +137,7 @@ describe('certainty-explanation highlight (4.2, 4.3)', () => {
   })
 })
 
-describe('BoardRenderer axis labels (2.1)', () => {
+describe('BoardRenderer axis labels', () => {
   it('draws a column letter for each column and a row number for each row, matching known positions', () => {
     const { canvas, fillTexts } = makeFakeCanvas()
     const cellSize = 10

@@ -1,5 +1,5 @@
 // Hand-authored, fixed toy scenarios for the explainer page's illustrations
-// (design.md decision 3). Every fixture is a real, self-consistent minesweeper position:
+// Every fixture is a real, self-consistent minesweeper position:
 // each revealed cell's number is its true adjacent-mine count for the layout the scenario
 // describes, so the solver's answers about them are the answers a player would really get.
 //
@@ -28,7 +28,7 @@ function parseSolverBoard(rows: readonly string[], mineCount: number): SolverBoa
  * premise and B1's `1` is already accounted for, so A1 is safe. Two cells, no counting, no
  * search - the deduction almost every flag in an ordinary game comes from.
  *
- * Drawn with `hideSolverOutput`, because the point of the figure is the deduction the reader
+ * Drawn without solver output, because the point of the figure is the deduction the reader
  * makes, not the answer the solver would paint on it.
  */
 export const TRIVIAL_BOARD: SolverBoard = parseSolverBoard(['?1', '?1', '11'], 1)
@@ -37,7 +37,7 @@ export const TRIVIAL_BOARD: SolverBoard = parseSolverBoard(['?1', '?1', '11'], 1
 export const TRIVIAL_FOCUS_CELL: Coord = { row: 1, col: 0 }
 
 /**
- * Worlds-tree scenario (design.md decision 3), shared by the probability and information-gain
+ * Worlds-tree scenario, shared by the probability and information-gain
  * illustrations. Five unknown cells; the pruned search over them ends in 12 tips, four of which
  * are consistent worlds.
  *
@@ -62,7 +62,7 @@ export const WORLDS_TREE_BOARD: SolverBoard = parseSolverBoard(['?10', '?31', '?
 export const WORLDS_TREE_FOCUS_CELL: Coord = { row: 1, col: 0 }
 
 /**
- * Certainty-explanation scenario (design.md decisions 3 and 6), deliberately distinct from
+ * Certainty-explanation scenario, deliberately distinct from
  * the worlds-tree scenario because it demonstrates a different mechanism.
  *
  * The `1` at E2 has exactly one unrevealed neighbor, D1, so D1 must be the mine; the `1` at
@@ -78,7 +78,7 @@ export const CERTAINTY_BOARD: SolverBoard = parseSolverBoard(['????1', '?2211'],
 export const CERTAINTY_FOCUS_CELL: Coord = { row: 0, col: 2 }
 
 /**
- * Canned uncertainty trace (design.md decision 8). Move 3 is the cliff - one reveal that
+ * Canned uncertainty trace. Move 3 is the cliff - one reveal that
  * cascades and collapses most of the board's remaining uncertainty; moves 3 through 6 are the
  * flat stretch, three reveals that each confirm something the solver had largely pinned down.
  */

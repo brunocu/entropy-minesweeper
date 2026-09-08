@@ -1,6 +1,6 @@
-// Runtime code for the explainer page. Only the predicted-vs-realized widget needs the browser
-// (design.md decision 2a) - every other illustration arrives as static markup injected at build
-// time by the Vite plugin in vite.config.ts.
+// Runtime code for the explainer page. Only the predicted-vs-realized widget needs the browser -
+// every other illustration arrives as static markup injected at build time by the Vite plugin in
+// vite.config.ts.
 import { WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from './fixtures.ts'
 import { createRevealDemo } from './revealDemo.ts'
 

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { toLabel } from '../../board/chessLabel.ts'
-import { solve } from '../../solver/probability.ts'
 import { TRIVIAL_BOARD, TRIVIAL_FOCUS_CELL, WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { renderUnsolvedBoard, renderWorldsTreeRootBoard } from '../illustrations.ts'
+import { solveFixture } from '../solvedFixture.ts'
 
 describe('worlds-tree root board', () => {
-  const svg = renderWorldsTreeRootBoard(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL)
-  const { result } = solve(WORLDS_TREE_BOARD, new Map())
+  const fixture = solveFixture(WORLDS_TREE_BOARD)
+  const result = fixture.result
+  const svg = renderWorldsTreeRootBoard(fixture, WORLDS_TREE_FOCUS_CELL)
 
   it('draws every cell of the position the tree enumerates', () => {
     const cells = svg.match(/data-cell="/g) ?? []
@@ -48,7 +49,7 @@ describe('unsolved board', () => {
   // answer the question in the same breath as asking it, so these boards must carry no solver
   // output at all - not the probability fill, and not the ring that marks a cell as settled.
   const svg = renderUnsolvedBoard(TRIVIAL_BOARD, TRIVIAL_FOCUS_CELL, 'A covered board')
-  const { result } = solve(TRIVIAL_BOARD, new Map())
+  const { result } = solveFixture(TRIVIAL_BOARD)
 
   it('draws every unrevealed cell in the same covered fill', () => {
     const fills = [...svg.matchAll(/data-cell="(\d+),(\d+)"[^>]*fill="([^"]+)"/g)]

@@ -1,18 +1,34 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Board } from '../../board/board.ts'
 import { boardFromMineLayout } from '../../__tests__/support/boardFactory.ts'
+import {
+  getDecompositionCallCountForTest,
+  resetDecompositionCallCountForTest,
+} from '../../solver/instrumentation.ts'
 import { GameController } from '../gameController.ts'
 
-describe('one solver pass per settled board state (4.2)', () => {
+/** A solver stub that reports an empty frontier and a fixed total uncertainty. */
+function makeSolveFn(bits = 0) {
+  return vi.fn(() => ({
+    result: {
+      frontier: [],
+      frontierByKey: new Map(),
+      nonFrontierProbability: null,
+      nonFrontierCells: [],
+      totalEntropyBits: bits,
+    },
+    worlds: [],
+    cache: new Map(),
+  }))
+}
+
+describe('one solver pass per settled board state', () => {
   it('calls the solver exactly once for a reveal that flood-fills many cells', () => {
     // 5x5 board with mines filling column 2: revealing (2,0) cascades across columns 0-1.
     const layout = Array.from({ length: 5 }, () => Array.from({ length: 5 }, (_, col) => col === 2))
     const board = boardFromMineLayout(layout)
 
-    const solveFn = vi.fn(() => ({
-      result: { frontier: [], nonFrontierProbability: null, nonFrontierCells: [], totalEntropyBits: 0 },
-      cache: new Map(),
-    }))
+    const solveFn = makeSolveFn()
     const controller = new GameController(board, solveFn)
     solveFn.mockClear() // ignore the constructor's initial pass
 
@@ -25,10 +41,7 @@ describe('one solver pass per settled board state (4.2)', () => {
 
   it('calls the solver exactly once for a single-cell reveal and never for a flag toggle', () => {
     const board = new Board(3, 3, 1)
-    const solveFn = vi.fn(() => ({
-      result: { frontier: [], nonFrontierProbability: null, nonFrontierCells: [], totalEntropyBits: 0 },
-      cache: new Map(),
-    }))
+    const solveFn = makeSolveFn()
     const controller = new GameController(board, solveFn)
     solveFn.mockClear()
 
@@ -40,14 +53,30 @@ describe('one solver pass per settled board state (4.2)', () => {
   })
 })
 
-describe('uncertainty history', () => {
-  function makeSolveFn(bits: number) {
-    return vi.fn(() => ({
-      result: { frontier: [], nonFrontierProbability: null, nonFrontierCells: [], totalEntropyBits: bits },
-      cache: new Map(),
-    }))
-  }
+describe('one board decomposition per settled board state', () => {
+  // `solve` and `computeExplanations` share one decomposition per settled board state, rather
+  // than each deriving the frontier/constraint/component phase for itself.
+  it('decomposes exactly once for a reveal, not once per solver consumer', () => {
+    const controller = new GameController(boardFromMineLayout([[false], [false], [true], [false], [true]]))
 
+    resetDecompositionCallCountForTest()
+    controller.reveal(0, 0)
+
+    expect(getDecompositionCallCountForTest()).toBe(1)
+  })
+
+  it('never decomposes for a flag toggle: flags cannot change the decomposition', () => {
+    const controller = new GameController(boardFromMineLayout([[false], [false], [true], [false], [true]]))
+    controller.reveal(0, 0)
+
+    resetDecompositionCallCountForTest()
+    controller.toggleFlag(2, 0)
+
+    expect(getDecompositionCallCountForTest()).toBe(0)
+  })
+})
+
+describe('uncertainty history', () => {
   it('starts with exactly one history entry at move index 0', () => {
     const board = new Board(3, 3, 1)
     const controller = new GameController(board, makeSolveFn(5))
@@ -107,7 +136,7 @@ describe('uncertainty history', () => {
   })
 })
 
-describe('explanation lookup wiring (3.2)', () => {
+describe('explanation lookup wiring', () => {
   it('reflects board state after each reveal, recomputed (not stale) on the next one', () => {
     // Width-1 corridor, mines at rows 2 and 4. Revealing (0,0) cascades into (1,0)="1",
     // which alone forces (2,0) mine. Revealing (3,0) afterwards adds a "2" whose two
@@ -128,7 +157,7 @@ describe('explanation lookup wiring (3.2)', () => {
   })
 })
 
-describe('explanation recompute on flag toggle (9.1-9.3)', () => {
+describe('explanation recompute on flag toggle', () => {
   // Same deduction chain as explanation.test.ts's flag-aware premise-seeding fixture,
   // adapted to a real, consistent mine layout (width-1 corridor, mines at rows 1 and 5):
   // ClueA=(0,0) forces M1=(1,0) mine on its own; ClueB=(2,0) then needs M1 to force
@@ -137,11 +166,8 @@ describe('explanation recompute on flag toggle (9.1-9.3)', () => {
   // should let it drop ClueA.
   const layout = [[false], [true], [false], [false], [false], [true]]
 
-  it('never calls solveFn for a flag toggle (extends 4.2)', () => {
-    const solveFn = vi.fn(() => ({
-      result: { frontier: [], nonFrontierProbability: null, nonFrontierCells: [], totalEntropyBits: 0 },
-      cache: new Map(),
-    }))
+  it('never calls solveFn for a flag toggle', () => {
+    const solveFn = makeSolveFn()
     const controller = new GameController(boardFromMineLayout(layout), solveFn)
     solveFn.mockClear()
 

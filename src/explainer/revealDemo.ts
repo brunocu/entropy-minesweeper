@@ -1,16 +1,17 @@
-// The explainer's one runtime widget (design.md decision 7): a playable toy board where the
-// reader clicks the focus cell, an outcome is drawn weighted by its real solver-computed
-// probability, and the predicted EIG is set against the information that reveal actually
-// delivered.
+// The explainer's one runtime widget: a playable toy board where the reader clicks the focus
+// cell, an outcome is drawn weighted by its real solver-computed probability, and the predicted
+// EIG is set against the information that reveal actually delivered.
 //
 // It draws through the live game's own `BoardRenderer`, so the board here looks exactly like
 // the board there, and it runs `computeRevealFeedback` - the same function `src/main.ts` calls
 // after a real click - so neither number is hand-authored.
 import { toLabel } from '../board/chessLabel.ts'
 import { BoardRenderer, type RenderBoard, type RenderCell } from '../render/boardRenderer.ts'
+import { cellSolverValues } from '../render/cellSolverValues.ts'
 import { pixelToCell } from '../render/hitTest.ts'
+import { decompose } from '../solver/decomposition.ts'
 import { solve } from '../solver/probability.ts'
-import type { Coord, SolveResult, SolverBoard } from '../solver/types.ts'
+import { key, type Coord, type SolveResult, type SolverBoard } from '../solver/types.ts'
 import { simulateReveal, worldCount, type SimulatedReveal } from './predictedVsRealized.ts'
 
 const CELL_SIZE = 44
@@ -32,15 +33,11 @@ function toRenderBoard(
   result: SolveResult,
   revealedCell: { readonly cell: Coord; readonly outcome: string } | null,
 ): RenderBoard {
-  const probabilities = new Map(result.frontier.map((f) => [`${f.row},${f.col}`, f.probability]))
-  const eigs = new Map(result.frontier.map((f) => [`${f.row},${f.col}`, f.eig]))
-
   return {
     width: board.width,
     height: board.height,
     cells: board.cells.map((row, rowIndex) =>
       row.map((cell, colIndex): RenderCell => {
-        const key = `${rowIndex},${colIndex}`
         const isRevealedTarget =
           revealedCell !== null && revealedCell.cell.row === rowIndex && revealedCell.cell.col === colIndex
         const hitMine = isRevealedTarget && revealedCell.outcome === 'mine'
@@ -48,13 +45,15 @@ function toRenderBoard(
         const adjacentMines =
           isRevealedTarget && !hitMine ? Number(revealedCell.outcome.slice('safe:'.length)) : cell.adjacentMines
 
+        const { probability, eig } = cellSolverValues(result, key(rowIndex, colIndex), revealed)
+
         return {
           revealed,
           flagged: false,
           isMine: hitMine,
           adjacentMines,
-          probability: revealed ? null : (probabilities.get(key) ?? result.nonFrontierProbability),
-          eig: revealed ? null : (eigs.get(key) ?? null),
+          probability,
+          eig,
           highlightRole: null,
         }
       }),
@@ -77,8 +76,8 @@ export function createRevealDemo(
   random: () => number = Math.random,
 ): { reset(): void } {
   const renderer = new BoardRenderer(elements.canvas, { cellSize: CELL_SIZE })
-  const { result: preRevealSolve } = solve(board, new Map())
-  const focusResult = preRevealSolve.frontier.find((f) => f.row === focusCell.row && f.col === focusCell.col)
+  const { result: preRevealSolve } = solve(decompose(board), new Map())
+  const focusResult = preRevealSolve.frontierByKey.get(key(focusCell.row, focusCell.col))
   if (!focusResult) throw new Error(`demo cell ${focusCell.row},${focusCell.col} is not a frontier cell`)
   const focusLabel = toLabel(focusCell.row, focusCell.col)
   const worldsBefore = worldCount(preRevealSolve)

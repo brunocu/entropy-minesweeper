@@ -1,6 +1,6 @@
-// Wraps uplot for the live total-uncertainty-vs-move-index chart (design.md decision:
-// "New module src/render/uncertaintyChart.ts"). Keeps uPlot construction/update concerns
-// out of main.ts's orchestration, mirroring boardRenderer.ts/probabilityColor.ts.
+// Wraps uplot for the live total-uncertainty-vs-move-index chart. Keeps uPlot
+// construction/update concerns out of main.ts's orchestration, mirroring
+// boardRenderer.ts/probabilityColor.ts.
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 

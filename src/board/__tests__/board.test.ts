@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Board } from '../board.ts'
 import { boardFromMineLayout } from '../../__tests__/support/boardFactory.ts'
 
-describe('board construction (2.1)', () => {
+describe('board construction', () => {
   it.each([
     [8, 8, 10],
     [30, 16, 99],
@@ -24,7 +24,7 @@ describe('board construction (2.1)', () => {
   })
 })
 
-describe('deferred first-click-safe mine placement (2.2)', () => {
+describe('deferred first-click-safe mine placement', () => {
   it('never places a mine on the first-clicked cell or its neighbors, across many trials', () => {
     const width = 5
     const height = 5
@@ -49,7 +49,7 @@ describe('deferred first-click-safe mine placement (2.2)', () => {
   })
 })
 
-describe('single-cell reveal (2.3)', () => {
+describe('single-cell reveal', () => {
   it('revealing a numbered cell exposes its adjacent mine count', () => {
     // 3x3 board, single mine at (0,0); revealing (2,2) is far from mine
     // but (1,1) or edges adjacent to it become numbered.
@@ -90,7 +90,7 @@ describe('single-cell reveal (2.3)', () => {
   })
 })
 
-describe('flood-fill reveal (2.4)', () => {
+describe('flood-fill reveal', () => {
   it('reveals exactly the connected zero region plus its numbered border, on a known layout', () => {
     // 5x5 board: mines fill column 2, splitting the board into an
     // isolated zero region in columns 0-1 and untouched columns 3-4.
@@ -124,7 +124,7 @@ describe('flood-fill reveal (2.4)', () => {
   })
 })
 
-describe('flagging (2.5)', () => {
+describe('flagging', () => {
   it('toggles a flag on an unrevealed cell', () => {
     const board = new Board(3, 3, 1)
     board.toggleFlag(1, 1)
@@ -214,7 +214,7 @@ describe('reveal/toggleFlag report whether they mutated state', () => {
   })
 })
 
-describe('win/loss detection (2.6)', () => {
+describe('win/loss detection', () => {
   it('declares a win the moment every non-mine cell is revealed', () => {
     const board = boardFromMineLayout([
       [true, false],

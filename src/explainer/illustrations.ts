@@ -1,6 +1,6 @@
 // Composes the explainer's static illustrations from the fixed fixtures and the generators.
-// Everything here runs at build/dev-server-transform time inside the Vite plugin (design.md
-// decision 2a); nothing in this module is shipped to the browser.
+// Everything here runs at build/dev-server-transform time inside the Vite plugin; nothing in
+// this module is shipped to the browser.
 import { toLabel } from '../board/chessLabel.ts'
 import { type Coord, type SolverBoard } from '../solver/types.ts'
 import { renderBoardSvg } from './boardSvg.ts'
@@ -16,6 +16,7 @@ import {
   WORLDS_TREE_BOARD,
   WORLDS_TREE_FOCUS_CELL,
 } from './fixtures.ts'
+import { solveFixture, type SolvedFixture } from './solvedFixture.ts'
 import { renderUncertaintyChart, type ChartAnnotation } from './uncertaintyChartSvg.ts'
 import { renderWorldsTree } from './worldsTree.ts'
 
@@ -34,9 +35,9 @@ export const UNCERTAINTY_ANNOTATIONS: readonly ChartAnnotation[] = [
  * The position each worlds tree is enumerating, drawn above it. Without this the tree's leaves
  * are labels with nothing to point at; with it the reader can check a branch against the board.
  */
-export function renderWorldsTreeRootBoard(board: SolverBoard, focusCell: Coord): string {
+export function renderWorldsTreeRootBoard(fixture: SolvedFixture, focusCell: Coord): string {
   const focusLabel = toLabel(focusCell.row, focusCell.col)
-  return renderBoardSvg(board, {
+  return renderBoardSvg(fixture.board, fixture.result, {
     focusCell,
     labelUnrevealedCells: true,
     className: 'root-board',
@@ -50,9 +51,8 @@ export function renderWorldsTreeRootBoard(board: SolverBoard, focusCell: Coord):
  * would give their own answers away if they carried the heatmap.
  */
 export function renderUnsolvedBoard(board: SolverBoard, focusCell: Coord | undefined, ariaLabel: string): string {
-  return renderBoardSvg(board, {
+  return renderBoardSvg(board, null, {
     focusCell,
-    hideSolverOutput: true,
     labelUnrevealedCells: true,
     className: 'unsolved-board',
     ariaLabel,
@@ -86,6 +86,11 @@ export function buildIllustrationFiles(): IllustrationFile[] {
     source,
   })
 
+  // One solve per fixture for the whole build: the root board, both worlds trees and the
+  // certainty board below are all drawn from these, so they cannot disagree.
+  const worldsTree = solveFixture(WORLDS_TREE_BOARD)
+  const certainty = solveFixture(CERTAINTY_BOARD)
+
   return [
     file(
       'intro-trivial-board',
@@ -103,10 +108,10 @@ export function buildIllustrationFiles(): IllustrationFile[] {
         'The same covered board the rest of the article uses, where no single clue has only one way to be satisfied',
       ),
     ),
-    file('worlds-tree-board', renderWorldsTreeRootBoard(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL)),
-    file('worlds-tree-probability', renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'probability')),
-    file('worlds-tree-eig', renderWorldsTree(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'eig')),
-    file('certainty-board', renderCertaintyBoard(CERTAINTY_BOARD, CERTAINTY_FOCUS_CELL)),
+    file('worlds-tree-board', renderWorldsTreeRootBoard(worldsTree, WORLDS_TREE_FOCUS_CELL)),
+    file('worlds-tree-probability', renderWorldsTree(worldsTree, WORLDS_TREE_FOCUS_CELL, 'probability')),
+    file('worlds-tree-eig', renderWorldsTree(worldsTree, WORLDS_TREE_FOCUS_CELL, 'eig')),
+    file('certainty-board', renderCertaintyBoard(certainty, CERTAINTY_FOCUS_CELL)),
     file('uncertainty-chart', renderUncertaintyChart(UNCERTAINTY_TRACE, UNCERTAINTY_ANNOTATIONS)),
   ]
 }

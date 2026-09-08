@@ -1,8 +1,7 @@
 // Exact probabilistic inference over a minesweeper board's frontier: worlds, per-cell mine
 // probabilities, expected information gain, and outcome distributions.
-// See openspec/changes/entropy-minesweeper/specs/frontier-solver/spec.md and design.md.
 
-import { buildConstraints, computeComponents, identifyFrontier, neighbors } from './decomposition.ts'
+import { neighbors, type Decomposition } from './decomposition.ts'
 import {
   componentSignature,
   enumerateComponentFull,
@@ -78,7 +77,7 @@ function computeNeighborInfo(board: SolverBoard, x: Coord, frontierSet: Readonly
 }
 
 /**
- * 3.7/3.8 EIG and outcome distribution for one frontier cell.
+ * EIG and outcome distribution for one frontier cell.
  *
  * A frontier cell can have unrevealed neighbors that are themselves non-frontier
  * (not adjacent to any revealed number yet). Their mine/safe status still affects
@@ -148,6 +147,16 @@ const EMPTY_FLAGGED_CELLS: ReadonlySet<string> = new Set()
 
 export interface SolveWithCache {
   readonly result: SolveResult
+  /**
+   * The individual weighted worlds `result` aggregates over, in enumeration order, keyed by the
+   * solver's own `row,col` key and indexable against `result.frontier`.
+   *
+   * Reported alongside the aggregates rather than from a second entry point because they come
+   * from the same enumeration: the explainer's worlds-tree illustration draws these branches and
+   * quotes `result`'s probability and EIG beside them, and two ways in would mean enumerating the
+   * board twice. The live game ignores this field.
+   */
+  readonly worlds: readonly WeightedWorld[]
   readonly cache: ComponentCache
 }
 
@@ -166,44 +175,27 @@ interface WorldEnumeration {
 }
 
 /**
- * 3.5 The enumeration half of the pipeline: frontier -> components -> worlds, each world
+ * The enumeration half of the pipeline: frontier -> components -> worlds, each world
  * weighted by how many ways its leftover mines can fall across the non-frontier cells.
- * `solve` turns this into probabilities/EIG; `enumerateWeightedWorlds` hands it to the
- * explainer verbatim. Both read the same output, so neither can drift from the other.
+ * `solve` turns this into probabilities/EIG and hands the worlds themselves on to the explainer
+ * verbatim. Both views read this one output, so neither can drift from the other.
  */
-function enumerateWorlds(board: SolverBoard, previousCache: ComponentCache): WorldEnumeration {
-  const frontierCoords = identifyFrontier(board)
-  const frontierKeys = frontierCoords.map((c) => key(c.row, c.col))
-  const frontierSet = new Set(frontierKeys)
-
-  const constraints = buildConstraints(board)
-  const components = computeComponents(frontierKeys, constraints)
+function enumerateWorlds(decomposition: Decomposition, previousCache: ComponentCache): WorldEnumeration {
+  const { board, frontierCoords, frontierKeys, frontierSet, componentSlices, nonFrontierCells } = decomposition
 
   const newCache = new Map<string, ComponentCacheEntry>()
-  const componentResultsList = [...components.values()].map((cells) => {
-    const cellSet = new Set(cells)
-    const relevantConstraints = constraints.filter((c) => c.cells.some((k) => cellSet.has(k)))
+  const componentResultsList = componentSlices.map(({ cells, relevantConstraints }) => {
     const signature = componentSignature(cells, relevantConstraints, EMPTY_FLAGGED_CELLS)
     const cached = previousCache.get(signature)
     let enumeration = cached?.enumeration
     if (!enumeration) {
       incrementEnumerationCallCount()
-      enumeration = enumerateComponentFull(cells, constraints)
+      enumeration = enumerateComponentFull(cells, relevantConstraints)
     }
     newCache.set(signature, { enumeration, explanations: cached?.explanations })
     return enumeration.assignments
   })
 
-  const nonFrontierCells: Coord[] = []
-  for (let row = 0; row < board.height; row++) {
-    for (let col = 0; col < board.width; col++) {
-      const cell = board.cells[row][col]
-      if (cell.revealed) continue
-      const k = key(row, col)
-      if (frontierSet.has(k)) continue
-      nonFrontierCells.push({ row, col })
-    }
-  }
   const K = nonFrontierCells.length
   const remainingMines = board.mineCount
 
@@ -258,46 +250,41 @@ export interface WeightedWorld {
   readonly nonFrontierMines: number
 }
 
-export interface WeightedWorlds {
-  /** Frontier cells in the order the solver enumerated them - the demo's branching order. */
-  readonly frontierCells: readonly Coord[]
-  readonly worlds: readonly WeightedWorld[]
-  readonly nonFrontierCellCount: number
+function toWeightedWorlds(enumeration: WorldEnumeration): WeightedWorld[] {
+  const { combosData, Z } = enumeration
+  return combosData.map((combo) => ({
+    assignment: combo.fullAssignment,
+    weight: Z > 0 ? combo.weight / Z : 0,
+    nonFrontierMines: combo.remaining,
+  }))
 }
 
 /**
- * Demo-oriented view of the solver's internals for the explainer page's worlds-tree
- * illustration (add-explainer-page design.md decision 2). `solve` already enumerates and
- * weights exactly these worlds on its way to per-cell probabilities and EIG, but only reports
- * the aggregates; this returns the underlying list so the illustration can draw the individual
- * worlds instead of recomputing (and eventually mis-computing) them.
+ * Runs the enumerating half of the solver pipeline over a decomposition `decompose` has already
+ * derived from the board: worlds -> probabilities/EIG, reporting both the aggregates and the
+ * worlds they were aggregated from.
  *
- * Deliberately narrow: not part of the solver's gameplay-facing contract, and nothing in the
- * live game calls it.
- */
-export function enumerateWeightedWorlds(board: SolverBoard): WeightedWorlds {
-  const { frontierCoords, nonFrontierCells, combosData, Z } = enumerateWorlds(board, new Map())
-  return {
-    frontierCells: frontierCoords,
-    nonFrontierCellCount: nonFrontierCells.length,
-    worlds: combosData.map((combo) => ({
-      assignment: combo.fullAssignment,
-      weight: Z > 0 ? combo.weight / Z : 0,
-      nonFrontierMines: combo.remaining,
-    })),
-  }
-}
-
-/**
- * 3.5/3.6 Runs the full solver pipeline: frontier -> components -> worlds -> probabilities/EIG.
+ * The one way in. Neither half can be reconstructed from the other - the worlds are gone from a
+ * `SolveResult`, and EIG needs `computeFrontierCellResult`'s shadow-neighbor folding while the
+ * total uncertainty is `log2(Z)`, which the normalized world weights no longer carry - so a
+ * separate entry point per view would mean enumerating a board twice to get both. Building the
+ * world list costs a fraction of the per-frontier-cell EIG pass this already runs, so the callers
+ * that ignore it are not paying for it in any measurable way.
+ *
+ * Takes the decomposition rather than the board because `GameController` runs this and
+ * `computeExplanations` against the same board every move, and the frontier/constraint/component
+ * phase they share is worth doing once. The decomposition carries its own board, so there is no
+ * second argument to keep in sync with it.
  *
  * Has no access to flagged cells, so its per-component signature always uses an empty
- * flagged-cell set (design.md D1/D3, entropy-minesweeper) - `enumerateComponentFull`'s result
- * never depends on flags, so this is always safe, only occasionally missing a cache hit that
- * `computeExplanations` (which does know the real flags) could otherwise have supplied within
- * the same pass.
+ * flagged-cell set - `enumerateComponentFull`'s result never depends on flags, so this is always
+ * safe, only occasionally missing a cache hit that `computeExplanations` (which does know the
+ * real flags) could otherwise have supplied within the same pass. That the signature is built
+ * here rather than in the shared decomposition is what keeps flags out of the shared value.
  */
-export function solve(board: SolverBoard, previousCache: ComponentCache): SolveWithCache {
+export function solve(decomposition: Decomposition, previousCache: ComponentCache): SolveWithCache {
+  const { board } = decomposition
+  const enumeration = enumerateWorlds(decomposition, previousCache)
   const {
     frontierCoords,
     frontierSet,
@@ -307,22 +294,26 @@ export function solve(board: SolverBoard, previousCache: ComponentCache): SolveW
     sumMineWeight,
     sumNonFrontierWeighted,
     cache: newCache,
-  } = enumerateWorlds(board, previousCache)
+  } = enumeration
   const K = nonFrontierCells.length
 
   const probabilityOf = (k: string): number => (Z > 0 ? (sumMineWeight.get(k) ?? 0) / Z : NaN)
   const nonFrontierProbability = K > 0 && Z > 0 ? sumNonFrontierWeighted / (Z * K) : null
 
+  const frontierByKey = new Map<string, FrontierCellResult>()
   const frontierResults = frontierCoords.map((x) => {
     const xKey = key(x.row, x.col)
     const info = computeNeighborInfo(board, x, frontierSet)
-    return computeFrontierCellResult(x, xKey, info, combosData, K, probabilityOf)
+    const cellResult = computeFrontierCellResult(x, xKey, info, combosData, K, probabilityOf)
+    frontierByKey.set(xKey, cellResult)
+    return cellResult
   })
 
   const totalEntropyBits = Z > 0 ? Math.log2(Z) : 0
 
   return {
-    result: { frontier: frontierResults, nonFrontierProbability, nonFrontierCells, totalEntropyBits },
+    result: { frontier: frontierResults, frontierByKey, nonFrontierProbability, nonFrontierCells, totalEntropyBits },
+    worlds: toWeightedWorlds(enumeration),
     cache: newCache,
   }
 }

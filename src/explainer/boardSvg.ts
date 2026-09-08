@@ -12,8 +12,8 @@ import {
   PREMISE_HIGHLIGHT_COLOR,
   probabilityColor,
 } from '../render/probabilityColor.ts'
-import { solve } from '../solver/probability.ts'
-import type { Coord, SolverBoard } from '../solver/types.ts'
+import { cellSolverValues } from '../render/cellSolverValues.ts'
+import type { Coord, SolveResult, SolverBoard } from '../solver/types.ts'
 
 /** Accent for "this is the cell under discussion", matching the EIG scale's violet. */
 const FOCUS_COLOR = '#4a3aa7'
@@ -31,12 +31,6 @@ export interface BoardSvgOptions {
   readonly focusCell?: Coord
   /** Writes each unrevealed cell's chess label into it, tying the board to the tree's leaves. */
   readonly labelUnrevealedCells?: boolean
-  /**
-   * Draws every unrevealed cell as a plain covered square - no probability fill, no EIG ramp, no
-   * certainty ring. The introduction's boards are positions posed as questions, and painting the
-   * solver's answer onto them answers the question before the reader has been asked it.
-   */
-  readonly hideSolverOutput?: boolean
   readonly className?: string
   readonly ariaLabel?: string
 }
@@ -45,14 +39,19 @@ function escapeXml(text: string): string {
   return text.replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]!)
 }
 
-/** Renders a solved `SolverBoard` as standalone inline SVG markup. */
-export function renderBoardSvg(board: SolverBoard, options: BoardSvgOptions = {}): string {
+/**
+ * Renders a `SolverBoard` as standalone inline SVG markup.
+ *
+ * Takes the solve rather than running one, so a fixture solved once can be drawn several ways
+ * Pass `null` for a board drawn without solver output - every
+ * unrevealed cell a plain covered square, no probability fill, no EIG ramp, no certainty ring.
+ * The introduction's boards are positions posed as questions, and painting the solver's answer
+ * onto them answers the question before the reader has been asked it.
+ */
+export function renderBoardSvg(board: SolverBoard, result: SolveResult | null, options: BoardSvgOptions = {}): string {
   const cellSize = options.cellSize ?? 54
   const margin = cellSize
-  const result = options.hideSolverOutput ? null : solve(board, new Map()).result
   const frontier = result?.frontier ?? []
-  const probabilities = new Map(frontier.map((f) => [`${f.row},${f.col}`, f.probability]))
-  const eigs = new Map(frontier.map((f) => [`${f.row},${f.col}`, f.eig]))
   const clueKeys = new Set((options.clueCells ?? []).map((c) => `${c.row},${c.col}`))
   const premiseKeys = new Set((options.premiseCells ?? []).map((c) => `${c.row},${c.col}`))
   const focusKey = options.focusCell ? `${options.focusCell.row},${options.focusCell.col}` : null
@@ -89,9 +88,7 @@ export function renderBoardSvg(board: SolverBoard, options: BoardSvgOptions = {}
       const cellKey = `${row},${col}`
       const x = margin + col * cellSize
       const y = margin + row * cellSize
-      const probability =
-        cell.revealed || result === null ? null : (probabilities.get(cellKey) ?? result.nonFrontierProbability)
-      const eig = eigs.get(cellKey) ?? null
+      const { probability, eig } = cellSolverValues(result, cellKey, cell.revealed)
 
       const fill = cell.revealed
         ? '#fcfcfb'

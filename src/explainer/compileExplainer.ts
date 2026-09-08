@@ -1,5 +1,5 @@
-// Compiles `explainer.md` into the final explainer page through a `unified()` pipeline
-// (design.md decision 1): `remark-parse` reads the Markdown, `remark-github-markdown-alerts`
+// Compiles `explainer.md` into the final explainer page through a `unified()` pipeline:
+// `remark-parse` reads the Markdown, `remark-github-markdown-alerts`
 // turns `> [!NOTE]` into the `.callout` markup, `remark-directive` plus `remarkExplainerDirectives`
 // turn `::: figure`/`:term-safe[...]`-style syntax into real elements, `remark-math` parses
 // `$...$`/`$$...$$`, `remark-rehype` (with raw-HTML passthrough for the figure images and the demo
@@ -7,7 +7,7 @@
 // `\[...\]`-delimited text for the client-side MathJax runtime to find and typeset - no wrapper
 // element needed, MathJax scans the page for the delimiters directly), and `rehype-stringify`
 // prints the result. `computeFigureValues()`/`substituteFigures()` (the `data-figure` injection)
-// stay exactly as before, applied as post-processing on the final HTML string.
+// run as post-processing on the final HTML string.
 import rehypeMathjax from 'rehype-mathjax/browser'
 import rehypeRaw from 'rehype-raw'
 import rehypeStringify from 'rehype-stringify'
@@ -19,7 +19,8 @@ import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import { toLabel } from '../board/chessLabel.ts'
 import { computeExplanations } from '../solver/explanation.ts'
-import { solve } from '../solver/probability.ts'
+import { key } from '../solver/types.ts'
+import { solveFixture } from './solvedFixture.ts'
 import { rehypeStripAlertTitle, remarkExplainerDirectives } from './directives.ts'
 import {
   CERTAINTY_BOARD,
@@ -32,9 +33,8 @@ import { buildWorldsTreeModel } from './worldsTree.ts'
 /**
  * The marker `explainer.html`'s shell carries, inside `<main id="explainer">`, in place of the
  * compiled article. It sits alongside the back-link rather than replacing the whole `<main>`
- * element, so the back-link stays inside `#explainer`'s centered, max-width column exactly as
- * it was before this split - moving it out to a shell-level sibling of `<main>` left it flush
- * against the body instead of aligned with the prose.
+ * element, so the back-link stays inside `#explainer`'s centered, max-width column: a
+ * shell-level sibling of `<main>` sits flush against the body instead of aligned with the prose.
  */
 export const EXPLAINER_PLACEHOLDER = '<!--explainer-content-->'
 
@@ -59,19 +59,24 @@ const processor = unified()
 
 /** Every `data-figure="name"` value the article quotes, computed from the real solver. */
 export function computeFigureValues(): Record<string, string> {
-  const { result: treeSolve } = solve(WORLDS_TREE_BOARD, new Map())
-  const focus = treeSolve.frontier.find(
-    (f) => f.row === WORLDS_TREE_FOCUS_CELL.row && f.col === WORLDS_TREE_FOCUS_CELL.col,
-  )!
-  const eigModel = buildWorldsTreeModel(WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL, 'eig')
+  // One solve per fixture here too, so the numbers quoted in the prose come from the same solve
+  // the figures beside them are drawn from.
+  const worldsTree = solveFixture(WORLDS_TREE_BOARD)
+  const treeSolve = worldsTree.result
+  const focus = treeSolve.frontierByKey.get(key(WORLDS_TREE_FOCUS_CELL.row, WORLDS_TREE_FOCUS_CELL.col))!
+  const eigModel = buildWorldsTreeModel(worldsTree, WORLDS_TREE_FOCUS_CELL, 'eig')
 
   const treeCertain = treeSolve.frontier.find((f) => f.probability === 1)!
-  const treeExplanation = computeExplanations(WORLDS_TREE_BOARD, treeSolve, new Set(), new Map()).explanations.get(
-    `${treeCertain.row},${treeCertain.col}`,
-  )!
+  const treeExplanation = computeExplanations(
+    worldsTree.decomposition,
+    treeSolve,
+    new Set(),
+    new Map(),
+  ).explanations.get(`${treeCertain.row},${treeCertain.col}`)!
 
-  const { result: certaintySolve } = solve(CERTAINTY_BOARD, new Map())
-  const { explanations } = computeExplanations(CERTAINTY_BOARD, certaintySolve, new Set(), new Map())
+  const certainty = solveFixture(CERTAINTY_BOARD)
+  const certaintySolve = certainty.result
+  const { explanations } = computeExplanations(certainty.decomposition, certaintySolve, new Set(), new Map())
   const explanation = explanations.get(`${CERTAINTY_FOCUS_CELL.row},${CERTAINTY_FOCUS_CELL.col}`)!
 
   return {

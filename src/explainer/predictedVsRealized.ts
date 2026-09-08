@@ -1,12 +1,13 @@
-// The explainer's one runtime demo (design.md decision 7): draw an outcome for a fixed toy
-// reveal, weighted by the outcome's real solver-computed probability, and report the same
-// predicted-vs-realized pair the live game reports after a click.
+// The explainer's one runtime demo: draw an outcome for a fixed toy reveal, weighted by the
+// outcome's real solver-computed probability, and report the same predicted-vs-realized pair
+// the live game reports after a click.
 //
 // Nothing here is hand-authored arithmetic: the probabilities come from `solve`, and the
 // comparison comes from `computeRevealFeedback`, exactly as in `main.ts`.
 import { computeRevealFeedback, type RevealFeedback } from '../game/revealFeedback.ts'
+import { decompose } from '../solver/decomposition.ts'
 import { solve } from '../solver/probability.ts'
-import type { Coord, SolveResult, SolverBoard } from '../solver/types.ts'
+import { key, type Coord, type SolveResult, type SolverBoard } from '../solver/types.ts'
 
 /** How many worlds a solve leaves standing; total uncertainty is log2 of this by definition. */
 export function worldCount(result: SolveResult): number {
@@ -52,6 +53,7 @@ export function pickWeighted(weights: ReadonlyMap<string, number>, random: () =>
 function informationStateAfter(preRevealSolve: SolveResult, outcomeProbability: number): SolveResult {
   return {
     frontier: [],
+    frontierByKey: new Map(),
     nonFrontierProbability: null,
     nonFrontierCells: [],
     totalEntropyBits: preRevealSolve.totalEntropyBits + Math.log2(outcomeProbability),
@@ -69,8 +71,8 @@ export function simulateReveal(
   random: () => number,
   preRevealSolve?: SolveResult,
 ): SimulatedReveal {
-  const preSolve = preRevealSolve ?? solve(board, new Map()).result
-  const frontierResult = preSolve.frontier.find((f) => f.row === cell.row && f.col === cell.col)
+  const preSolve = preRevealSolve ?? solve(decompose(board), new Map()).result
+  const frontierResult = preSolve.frontierByKey.get(key(cell.row, cell.col))
   if (!frontierResult) throw new Error(`demo cell ${cell.row},${cell.col} is not a frontier cell`)
 
   const outcome = pickWeighted(frontierResult.outcomeProbabilities, random)

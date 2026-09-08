@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Board } from '../../board/board.ts'
 import { DIFFICULTIES } from '../difficulty.ts'
 
-describe('board size/difficulty presets (7.2)', () => {
+describe('board size/difficulty presets', () => {
   it('defines Beginner, Intermediate, and Expert presets with the standard dimensions and mine counts', () => {
     const byName = new Map(DIFFICULTIES.map((d) => [d.name, d]))
     expect(byName.get('Beginner')).toEqual({ name: 'Beginner', width: 9, height: 9, mineCount: 10 })

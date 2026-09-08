@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { boardFromMineLayout } from '../../__tests__/support/boardFactory.ts'
 import type { ComponentCache } from '../componentEnumeration.ts'
+import { decompose } from '../decomposition.ts'
 import { computeExplanations } from '../explanation.ts'
 import { solve } from '../probability.ts'
 import type { SolverBoard } from '../types.ts'
@@ -10,8 +11,8 @@ import { snapshotSolverBoard } from '../../__tests__/support/solverBoard.ts'
 /** A 30x16/99-mine (Expert) layout with (0,0) kept safe, for a deterministic first click.
  * This seed (empirically found via a scan of seeds) happens to produce a real single frontier
  * component of 100+ cells that persists, essentially unchanged, across dozens of consecutive
- * moves deep into the game - exactly the "large, mostly-solved frontier" scenario proposal.md's
- * Why cites as the source of the multi-second `reveal()`/`toggleFlag()` hang. */
+ * moves deep into the game - exactly the "large, mostly-solved frontier" scenario behind the
+ * multi-second `reveal()`/`toggleFlag()` hang this cache exists to prevent. */
 function buildExpertLayout(): boolean[][] {
   const width = 30
   const height = 16
@@ -61,14 +62,22 @@ function runSequence(snapshots: readonly SolverBoard[], threadCache: boolean): n
   let cache: ComponentCache = new Map()
   const start = performance.now()
   for (const board of snapshots) {
-    const { result, cache: afterSolve } = solve(board, threadCache ? cache : new Map())
-    const { cache: afterExplain } = computeExplanations(board, result, new Set(), threadCache ? afterSolve : new Map())
+    // One decomposition per board state, shared by both consumers - the sequence being timed
+    // here is the one GameController runs per move.
+    const decomposition = decompose(board)
+    const { result, cache: afterSolve } = solve(decomposition, threadCache ? cache : new Map())
+    const { cache: afterExplain } = computeExplanations(
+      decomposition,
+      result,
+      new Set(),
+      threadCache ? afterSolve : new Map(),
+    )
     cache = afterExplain
   }
   return performance.now() - start
 }
 
-describe('component cache performance on an Expert-sized board (5.1)', () => {
+describe('component cache performance on an Expert-sized board', () => {
   it('reduces total wall-clock time for a sequence of moves on a large, mostly-solved frontier', () => {
     const layout = buildExpertLayout()
     const snapshots = buildMoveSnapshots(layout, 117, 60)

@@ -1,4 +1,4 @@
-// Build-time SVG generator for the explainer's canned uncertainty chart (design.md decision 8).
+// Build-time SVG generator for the explainer's canned uncertainty chart.
 // The live game plots this data with uPlot; here the trace is fixed, so it is plotted directly
 // into static markup rather than shipping a chart library to draw one unchanging line.
 import type { UncertaintyHistoryPoint } from '../render/uncertaintyChart.ts'
