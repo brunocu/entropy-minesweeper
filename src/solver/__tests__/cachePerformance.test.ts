@@ -3,6 +3,7 @@ import { boardFromMineLayout } from '../../__tests__/support/boardFactory.ts'
 import type { ComponentCache } from '../componentEnumeration.ts'
 import { decompose } from '../decomposition.ts'
 import { computeExplanations } from '../explanation.ts'
+import { getEnumerationCallCountForTest, resetEnumerationCallCountForTest } from '../instrumentation.ts'
 import { solve } from '../probability.ts'
 import type { SolverBoard } from '../types.ts'
 import { mulberry32 } from '../../__tests__/support/prng.ts'
@@ -58,8 +59,12 @@ function buildMoveSnapshots(layout: boolean[][], warmupClicks: number, moveCount
   return snapshots
 }
 
-function runSequence(snapshots: readonly SolverBoard[], threadCache: boolean): number {
+function runSequence(
+  snapshots: readonly SolverBoard[],
+  threadCache: boolean,
+): { ms: number; enumerationCalls: number } {
   let cache: ComponentCache = new Map()
+  resetEnumerationCallCountForTest()
   const start = performance.now()
   for (const board of snapshots) {
     // One decomposition per board state, shared by both consumers - the sequence being timed
@@ -74,22 +79,23 @@ function runSequence(snapshots: readonly SolverBoard[], threadCache: boolean): n
     )
     cache = afterExplain
   }
-  return performance.now() - start
+  return { ms: performance.now() - start, enumerationCalls: getEnumerationCallCountForTest() }
 }
 
 describe('component cache performance on an Expert-sized board', () => {
-  it('reduces total wall-clock time for a sequence of moves on a large, mostly-solved frontier', () => {
+  it('avoids re-enumerating components for a sequence of moves on a large, mostly-solved frontier', () => {
     const layout = buildExpertLayout()
     const snapshots = buildMoveSnapshots(layout, 117, 60)
     expect(snapshots.length).toBeGreaterThan(0)
 
-    // Run each variant twice and take the best-of-two, to reduce noise from JIT warm-up/GC pauses.
-    const uncachedMs = Math.min(runSequence(snapshots, false), runSequence(snapshots, false))
-    const cachedMs = Math.min(runSequence(snapshots, true), runSequence(snapshots, true))
+    const uncached = runSequence(snapshots, false)
+    const cached = runSequence(snapshots, true)
 
     // eslint-disable-next-line no-console
-    console.log(`[cache perf] uncached: ${uncachedMs.toFixed(1)}ms, cached: ${cachedMs.toFixed(1)}ms`)
+    console.log(`[cache perf] uncached: ${uncached.ms.toFixed(1)}ms, cached: ${cached.ms.toFixed(1)}ms`)
 
-    expect(cachedMs).toBeLessThan(uncachedMs)
+    // Wall-clock time is too noisy on shared CI runners to assert on directly; the enumeration
+    // call count is the deterministic proxy for the work the cache is meant to avoid redoing.
+    expect(cached.enumerationCalls).toBeLessThan(uncached.enumerationCalls)
   }, 60000)
 })
