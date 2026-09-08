@@ -1,0 +1,52 @@
+/* Game-page chrome, expressed against the shared tokens so the board page and the explainer read
+ * as one site. `main.ts` still sets these properties inline and therefore still wins; it is
+ * replaced wholesale by the Solid port, which emits these class names instead
+ * (unify-design-tokens design.md, decision 4). Until then the two states coexist. */
+
+body {
+  margin: 0;
+  padding: 1em;
+  background: var(--page);
+  color: var(--ink);
+  font-family: sans-serif;
+}
+
+a {
+  color: var(--safe);
+}
+
+.toolbar {
+  font-family: sans-serif;
+  margin-bottom: 0.5em;
+}
+
+.toolbar__mines-left {
+  margin-left: 1em;
+}
+
+.toolbar__explainer-link {
+  margin-left: 1.5em;
+}
+
+.main-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1em;
+}
+
+/* The four readouts under the board. Each reserves its line height whether or not it currently has
+ * text, so the board and chart never jump as readouts fill in and empty out. */
+.readout {
+  font-family: sans-serif;
+  min-height: 1.4em;
+  color: var(--ink);
+}
+
+/* Hover text is assembled as newline-joined lines rather than markup. */
+.readout--hover {
+  white-space: pre-line;
+}
+
+.readout--status {
+  font-weight: bold;
+}

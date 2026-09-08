@@ -8,24 +8,21 @@
 // share the hex-mixing helpers below, so this module's purpose is "p/eig -> color mapping
 // for the visualization."
 //
-// Poles/midpoint are the dataviz skill's documented diverging pair and neutral gray
-// (references/palette.md): blue<->red poles, gray midpoint.
-const SAFE_POLE = '#0d366b' // sequential blue ramp, step 700
-const MINE_POLE = '#d03b3b' // status "critical" red
-const NEUTRAL_MIDPOINT = '#c0c0c0' // diverging neutral midpoint, light surface
+// The values themselves live in src/design/tokens.ts, which the explainer page's CSS is also
+// generated from — the poles here and the `--safe`/`--mine` prose colors there are the same
+// token, so a term in the writing and a cell on the board never drift apart. The dataviz-palette
+// provenance for each choice is recorded alongside the values there.
+import { tokens } from '../design/tokens.ts'
 
-// Sequential EIG-gradient ramp: categorical slot 7 (violet), distinct from the diverging
-// scale's blue/red poles so the two never read as one continuous scale.
-const EIG_LOW = '#e3dff5' // light violet tint, near-surface (low EIG)
-const EIG_HIGH = '#4a3aa7' // categorical slot 7 violet, full saturation (high EIG)
+const SAFE_POLE = tokens.safe
+const MINE_POLE = tokens.mine
+const NEUTRAL_MIDPOINT = tokens.neutral
 
-// Certainty-explanation highlight outline colors: two more categorical slots, distinct from
-// the diverging poles above and the
-// EIG ramp's violet, so the explanation overlay never reads as another probability/EIG value.
-const CLUE_HIGHLIGHT = '#1baf7a' // categorical slot 3, aqua (revealed numbered clue cells)
-// Slot 5 magenta read too close to the mine-pole red on a p=1 (mine-colored) premise cell;
-// slot 6 green sits at the opposite end of the wheel from both that red and the aqua clue color.
-const PREMISE_HIGHLIGHT = '#008300' // categorical slot 6, green (unrevealed premise cells)
+const EIG_LOW = tokens.eigLow
+const EIG_HIGH = tokens.eig
+
+const CLUE_HIGHLIGHT = tokens.clue
+const PREMISE_HIGHLIGHT = tokens.premise
 
 function hexToRgb(hex: string): [number, number, number] {
   const n = Number.parseInt(hex.slice(1), 16)
