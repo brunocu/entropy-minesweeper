@@ -1,0 +1,19 @@
+/* Generated from src/design/tokens.ts by scripts/generate-tokens.mjs — do not edit. */
+:root {
+  --ink: #26241f;
+  --ink-soft: #5a5650;
+  --rule: #ddd9d2;
+  --surface: #fcfcfb;
+  --page: #f6f5f2;
+  --safe: #0d366b;
+  --mine: #d03b3b;
+  --neutral: #c0c0c0;
+  --eig-low: #e3dff5;
+  --eig: #4a3aa7;
+  --clue: #1baf7a;
+  --premise: #008300;
+  --neutral-dim: #7f8c8d;
+  --neutral-mid: #95a5a6;
+  --certainty-ring: #ffffff;
+  --cell-border: rgba(0, 0, 0, 0.25);
+}
