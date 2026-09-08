@@ -3,6 +3,7 @@
 // boardRenderer.ts/probabilityColor.ts.
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
+import { tokens } from '../design/tokens.ts'
 
 export interface UncertaintyHistoryPoint {
   readonly moveIndex: number
@@ -40,7 +41,7 @@ export function createUncertaintyChart(
       },
       { label: 'Bits' },
     ],
-    series: [{}, { label: 'Total entropy (bits)', stroke: '#2b6cb0', width: 2 }],
+    series: [{}, { label: 'Total entropy (bits)', stroke: tokens.safe, width: 2 }],
   }
 
   const plot = new uPlot(options, toAlignedData(initialHistory), container)

@@ -1,6 +1,7 @@
 // Canvas2D board renderer: one surface, a flat draw loop that
 // redraws cell fills every board-state change. No per-cell DOM nodes, no framework.
 import { toLabel } from '../board/chessLabel.ts'
+import { tokens } from '../design/tokens.ts'
 import { CLUE_HIGHLIGHT_COLOR, eigGradientColor, PREMISE_HIGHLIGHT_COLOR, probabilityColor } from './probabilityColor.ts'
 
 /** Certainty-explanation highlight role for a cell, or none. */
@@ -74,7 +75,7 @@ export class BoardRenderer {
 
         ctx.fillStyle = this.fillColorFor(cell, maxEig)
         ctx.fillRect(x, y, cellSize, cellSize)
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)'
+        ctx.strokeStyle = tokens.cellBorder
         ctx.lineWidth = 1
         ctx.strokeRect(x + 0.5, y + 0.5, cellSize - 1, cellSize - 1)
 
@@ -83,13 +84,13 @@ export class BoardRenderer {
         // p=0 or p=1) gets its own unambiguous marker on top of the fill.
         if (!cell.revealed && !cell.flagged && (cell.probability === 0 || cell.probability === 1)) {
           const inset = 3
-          ctx.strokeStyle = '#ffffff'
+          ctx.strokeStyle = tokens.certaintyRing
           ctx.lineWidth = 3
           ctx.strokeRect(x + inset, y + inset, cellSize - inset * 2, cellSize - inset * 2)
         }
 
         if (cell.revealed && !cell.isMine && cell.adjacentMines > 0) {
-          ctx.fillStyle = '#1a1a1a'
+          ctx.fillStyle = tokens.ink
           ctx.font = `${Math.round(cellSize * 0.6)}px sans-serif`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
@@ -97,14 +98,14 @@ export class BoardRenderer {
         }
 
         if (cell.revealed && cell.isMine) {
-          ctx.fillStyle = '#1a1a1a'
+          ctx.fillStyle = tokens.ink
           ctx.beginPath()
           ctx.arc(x + cellSize / 2, y + cellSize / 2, cellSize * 0.3, 0, Math.PI * 2)
           ctx.fill()
         }
 
         if (!cell.revealed && cell.flagged) {
-          ctx.fillStyle = '#c0392b'
+          ctx.fillStyle = tokens.mine
           ctx.beginPath()
           ctx.moveTo(x + cellSize * 0.35, y + cellSize * 0.2)
           ctx.lineTo(x + cellSize * 0.35, y + cellSize * 0.8)
@@ -130,7 +131,7 @@ export class BoardRenderer {
 
   private drawAxisLabels(board: RenderBoard, marginLeft: number, marginTop: number): void {
     const { ctx, cellSize } = this
-    ctx.fillStyle = '#1a1a1a'
+    ctx.fillStyle = tokens.ink
     ctx.font = `${Math.round(cellSize * 0.4)}px sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -147,17 +148,19 @@ export class BoardRenderer {
   }
 
   private fillColorFor(cell: RenderCell, maxEig: number | null): string {
-    // Cleared cells use the palette's near-white chart surface, deliberately far from the
-    // diverging scale's mid-gray neutral midpoint (#f0efec) so "cleared" and "totally
-    // uncertain" never read as the same color.
-    if (cell.revealed) return cell.isMine ? '#e74c3c' : '#fcfcfb'
-    if (cell.flagged) return '#7f8c8d'
+    // Cleared cells use the palette's near-white `surface`, deliberately far from the diverging
+    // scale's mid-gray `neutral` midpoint so "cleared" and "totally uncertain" never read as the
+    // same color. Named, not quoted: a value here would go stale the next time the token moves.
+    // The two grays below are for the same reason their own ramp steps rather than aliases of
+    // `neutral` - a flagged cell must not read as a maximally uncertain one.
+    if (cell.revealed) return cell.isMine ? tokens.mine : tokens.surface
+    if (cell.flagged) return tokens.neutralDim
     // Certain-safe frontier cells (p=0, has an individual EIG) get the sequential EIG-gradient
     // fill instead of the diverging scale's flat safe-pole color (spec: Certain-Safe Frontier
     // Cell EIG Gradient). Certain-safe non-frontier cells (eig === null) keep the flat pole color.
     if (cell.probability === 0 && cell.eig !== null && maxEig !== null) {
       return eigGradientColor(cell.eig, maxEig)
     }
-    return cell.probability === null ? '#95a5a6' : probabilityColor(cell.probability)
+    return cell.probability === null ? tokens.neutralMid : probabilityColor(cell.probability)
   }
 }
