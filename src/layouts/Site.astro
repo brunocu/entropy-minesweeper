@@ -1,0 +1,63 @@
+---
+/**
+ * The shell both pages share, so the game and the explainer read as one site rather than two.
+ *
+ * It carries only what is genuinely common - the document scaffolding and the design tokens. Each
+ * page brings its own stylesheet on top (`game.css`, `explainer.css`), mirroring the split
+ * `unify-design-tokens` established: tokens are shared, page chrome is not.
+ */
+import '../design/tokens.css'
+
+interface Props {
+  readonly title: string
+  /**
+   * Whether to load MathJax. Only the explainer has formulas, and the CDN bundle is far too large
+   * to ship to a page with nothing for it to typeset - so the layout owns the tag (there is one
+   * right way to load MathJax, and it should not be copied per page) while the page decides
+   * whether it is wanted.
+   */
+  readonly math?: boolean
+}
+
+const { title, math = false } = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    {
+      math && (
+        <Fragment>
+          <script is:inline>
+            window.MathJax = {
+              tex: {
+                inlineMath: [['\\(', '\\)']],
+                displayMath: [['\\[', '\\]']],
+              },
+              svg: {
+                // One shared glyph cache for the whole page instead of per-formula copies, and
+                // scrolling rather than page-widening for equations too wide for the prose column.
+                fontCache: 'global',
+                displayOverflow: 'scroll',
+              },
+            }
+          </script>
+          <script
+            is:inline
+            id="MathJax-script"
+            async
+            src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"
+            integrity="sha384-KKWa9jJ1MZvssLeOoXG6FiOAZfAgmzsIIfw8BXwI9+kYm0lPCbC6yTQPBC00F1/L"
+            crossorigin="anonymous"
+          />
+        </Fragment>
+      )
+    }
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

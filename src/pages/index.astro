@@ -1,0 +1,10 @@
+---
+// The game. Everything on this page is the Solid app, so the page itself is just the mount point.
+import '../design/game.css'
+import Site from '../layouts/Site.astro'
+import { App } from '../ui/App.tsx'
+---
+
+<Site title="Entropy Minesweeper">
+  <App client:only="solid-js" />
+</Site>

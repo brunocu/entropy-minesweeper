@@ -1,7 +1,7 @@
 // How a cell's solver-derived fill is read off a solve, in one place.
 //
-// Three renderers paint the same board the same way - the live canvas (`main.ts`), the
-// explainer's runtime demo (`explainer/revealDemo.ts`), and the explainer's static SVGs
+// Three renderers paint the same board the same way - the live canvas (`ui/BoardCanvas.tsx`), the
+// explainer's runtime demo (`explainer/RevealDemo.tsx`), and the explainer's static SVGs
 // (`explainer/boardSvg.ts`) - and all three must agree on it, or one of them shows a different
 // heatmap for the same position.
 //

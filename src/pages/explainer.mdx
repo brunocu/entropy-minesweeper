@@ -1,3 +1,17 @@
+---
+layout: ../layouts/Explainer.astro
+title: What does any of this mean? — Entropy Minesweeper
+---
+
+import { RevealDemo } from '../explainer/RevealDemo.tsx'
+import { computeFigureValues } from '../explainer/figures.ts'
+
+{/* Every number and cell label quoted below comes from here, so the article is a solve rather than
+    a transcription of one. Runs once, at build time. */}
+export const figures = computeFigureValues()
+
+export const illustration = (name) => `${import.meta.env.BASE_URL}assets/explainer/${name}.svg`
+
 # What does any of this mean?
 
 I made this project to answer three questions I had about Minesweeper:
@@ -16,39 +30,39 @@ That is, until it isn't.
 Whenever I plant a flag, the reasoning is nearly
 always the same shape: find a clue with only one way to be satisfied, and read the answer straight off it.
 
-::::figure{.board-figure}
-<img
-  src="/assets/explainer/intro-trivial-board.svg"
-  alt="A small covered board: the 1 at B3 has exactly one unrevealed neighbour, A2, which is ringed, and the 1 at B1 sees A1 and A2."
-/>
+<figure class="board-figure">
+  <img
+    src={illustration('intro-trivial-board')}
+    alt="A small covered board: the 1 at B3 has exactly one unrevealed neighbour, A2, which is ringed, and the 1 at B1 sees A1 and A2."
+  />
 
-:::figcaption
-The move that produces most flags in most games. The `1` at **B3** is adjacent to exactly
-one covered cell, so **A2** is a mine, there is nothing else it could be. Plant a flag.
-Take that as a premise and the `1` at **B1** has its mine already accounted for, which makes
-**A1** safe.
+  <figcaption>
+    The move that produces most flags in most games. The `1` at **B3** is adjacent to exactly
+    one covered cell, so **A2** is a mine, there is nothing else it could be. Plant a flag.
+    Take that as a premise and the `1` at **B1** has its mine already accounted for, which makes
+    **A1** safe.
 
-_This is how everyone starts, right?_
-:::
-::::
+    _This is how everyone starts, right?_
+  </figcaption>
+</figure>
 
 Most positions are a variation of this. Sometimes with more flags, but always a simple deduction that you can then use to make the next simple deduction, and so on.
 Which makes the interesting positions the ones where this stops working, and you actually get to use your brain.
 
-::::figure{.board-figure}
-<img
-  src="/assets/explainer/intro-open-board.svg"
-  alt="A covered board with five unknown cells labelled A1, A2, A3, B3 and C3, where no single clue has only one way to be satisfied."
-/>
+<figure class="board-figure">
+  <img
+    src={illustration('intro-open-board')}
+    alt="A covered board with five unknown cells labelled A1, A2, A3, B3 and C3, where no single clue has only one way to be satisfied."
+  />
 
-:::figcaption
-<span data-figure="mine-count">3</span> mines and five covered cells, and not one clue here can be resolved
-on its own. The `1` at **B1** lets us know there is one at A1 or A2, but cannot say which.
-The `1` at **C2** gives us the same information about B3 and C3.
-The `3` at **B2** *"sees"* all five at once. Everything in view constrains *how many* mines sit in a
-region without ever pinning down *which* cells are mined.
-:::
-::::
+  <figcaption>
+    {figures['mine-count']} mines and five covered cells, and not one clue here can be resolved
+    on its own. The `1` at **B1** lets us know there is one at A1 or A2, but cannot say which.
+    The `1` at **C2** gives us the same information about B3 and C3.
+    The `3` at **B2** *"sees"* all five at once. Everything in view constrains *how many* mines sit in a
+    region without ever pinning down *which* cells are mined.
+  </figcaption>
+</figure>
 
 Nothing there is forced, and yet the covered cells are plainly not equally dangerous: some are more restricted by
 the clues than others.
@@ -115,35 +129,34 @@ A complete tree would end in $2^5 = 32$ leaves, but most branches are ruled out 
 Once a partial assignment contradicts one of the equations in (1), every completion of it is impossible too,
 so we cut the branch there and mark it invalid.
 
-::::figure{.figure-wide}
-<div class="root-board-panel">
-  <img
-    src="/assets/explainer/worlds-tree-board.svg"
-    alt="The toy board the worlds tree enumerates: three mines, five unknown cells labelled A1, A2, A3, B3 and C3, with A2 ringed as the cell under discussion."
-  />
-</div>
-<div class="figure-scroll">
-  <img
-    src="/assets/explainer/worlds-tree-probability.svg"
-    alt="The pruned search over the five unknown cells: each branch stops where the clues rule it out, leaving twelve tips of which four are consistent worlds, each labelled with its weight, and the two where A2 is a mine are highlighted and bracketed."
-  />
-</div>
+<figure class="figure-wide">
+  <div class="root-board-panel">
+    <img
+      src={illustration('worlds-tree-board')}
+      alt="The toy board the worlds tree enumerates: three mines, five unknown cells labelled A1, A2, A3, B3 and C3, with A2 ringed as the cell under discussion."
+    />
+  </div>
 
-:::figcaption
-<span data-figure="mine-count">3</span> mines, <span data-figure="unknown-count">5</span> cells still
-unknown (<span data-figure="unknown-labels">A1, A2, A3, B3, C3</span>), and the branching search over them,
-each inconsistent branch cut at the depth the clues rule it out.
-<br />
-The highlighted branches are the consistent worlds where A2 is a mine. Their weights sum to
-<span data-figure="focus-probability">50.0%</span>,
-because A2's mine probability is just the count of consistent branches where A2 is a mine over the
-total count of consistent branches: $2/4$.
-<br />
-A3 is a mine in all four consistent worlds, so it comes back at
-$P = 1$ and we can be certain it is a mine, even though no one clue on this board settles
-anything on its own.
-:::
-::::
+  <div class="figure-scroll">
+    <img
+      src={illustration('worlds-tree-probability')}
+      alt="The pruned search over the five unknown cells: each branch stops where the clues rule it out, leaving twelve tips of which four are consistent worlds, each labelled with its weight, and the two where A2 is a mine are highlighted and bracketed."
+    />
+  </div>
+
+  <figcaption>
+    {figures['mine-count']} mines, {figures['unknown-count']} cells still
+    unknown ({figures['unknown-labels']}), and the branching search over them,
+    each inconsistent branch cut at the depth the clues rule it out.<br />
+    The highlighted branches are the consistent worlds where A2 is a mine. Their weights sum to
+    {figures['focus-probability']},
+    because A2's mine probability is just the count of consistent branches where A2 is a mine over the
+    total count of consistent branches: $2/4$.<br />
+    A3 is a mine in all four consistent worlds, so it comes back at
+    $P = 1$ and we can be certain it is a mine, even though no one clue on this board settles
+    anything on its own.
+  </figcaption>
+</figure>
 
 ## Frontier and non-frontier
 
@@ -186,21 +199,21 @@ P(y \mid a) = R(a)/K
   \tag{4}
 $$
 
-> [!NOTE]
->
-> The right-hand side does not mention $y$ at all, so it comes out the same for every non-frontier
-> cell. The underlying reason is
-> [exchangeability](https://en.wikipedia.org/wiki/Exchangeable_random_variables): no clue
-> distinguishes one non-frontier cell from another, so any world that mines cell
-> $y_1$
-> has a mirror world, equally consistent and equally likely, that mines
-> $y_2$ instead.
+<div class="callout">
+  The right-hand side does not mention $y$ at all, so it comes out the same for every non-frontier
+  cell. The underlying reason is
+  [exchangeability](https://en.wikipedia.org/wiki/Exchangeable_random_variables): no clue
+  distinguishes one non-frontier cell from another, so any world that mines cell
+  $y_1$
+  has a mirror world, equally consistent and equally likely, that mines
+  $y_2$ instead.
+</div>
 
 ## Reading the heatmap
 
 Each unrevealed cell is filled by its probability on a diverging scale:
-:term-safe[deep blue] at $P = 0$, a pale neutral at
-$P = 0.5$, :term-mine[red] at
+<span class="term-safe">deep blue</span> at $P = 0$, a pale neutral at
+$P = 0.5$, <span class="term-mine">red</span> at
 $P = 1$.
 
 To avoid confusion with probabilities close to $0$ or $1$, exact certainty also draws a white ring inside the cell.
@@ -261,27 +274,28 @@ So in that case, a cell's EIG is simply the entropy of its own answer distributi
 that cell's reading is on its own. A cell whose answer you can already guess teaches you nothing when you
 click it. A cell with several plausible readings, none of them a foregone conclusion, teaches you a lot.
 
-::::figure{.figure-wide}
-<div class="root-board-panel">
-  <img
-    src="/assets/explainer/worlds-tree-board.svg"
-    alt="The toy board the worlds tree enumerates: three mines, five unknown cells labelled A1, A2, A3, B3 and C3, with A2 ringed as the cell under discussion."
-  />
-</div>
-<div class="figure-scroll">
-  <img
-    src="/assets/explainer/worlds-tree-eig.svg"
-    alt="The same pruned search re-branched so A2 splits first, with the consistent worlds bracketed into the outcome groups revealing A2 would produce."
-  />
-</div>
+<figure class="figure-wide">
+  <div class="root-board-panel">
+    <img
+      src={illustration('worlds-tree-board')}
+      alt="The toy board the worlds tree enumerates: three mines, five unknown cells labelled A1, A2, A3, B3 and C3, with A2 ringed as the cell under discussion."
+    />
+  </div>
 
-:::figcaption
-The same position and the same
-<span data-figure="world-count">4</span> consistent worlds,
-bracketed by what revealing A2 would show. Each bracket is
-$W \mid O_x = o$, the worlds still standing after that particular answer.
-:::
-::::
+  <div class="figure-scroll">
+    <img
+      src={illustration('worlds-tree-eig')}
+      alt="The same pruned search re-branched so A2 splits first, with the consistent worlds bracketed into the outcome groups revealing A2 would produce."
+    />
+  </div>
+
+  <figcaption>
+    The same position and the same
+    {figures['world-count']} consistent worlds,
+    bracketed by what revealing A2 would show. Each bracket is
+    $W \mid O_x = o$, the worlds still standing after that particular answer.
+  </figcaption>
+</figure>
 
 On this board **A1**, **A2**, **B3** and
 **C3** all carry exactly the same $1/2$ risk, but they are not
@@ -304,16 +318,16 @@ the rest of the board outright.
 *Which cell is least likely to kill me* has four tied answers on this board, and
 *which cell teaches me most* breaks the tie.
 
-> [!NOTE]
->
-> One outcome is treated a little loosely here. A `0` doesn't just narrow $W$ down on its own
-> account, in the real game it also triggers a cascade, auto-revealing every neighbouring cell and
-> recursing wherever those are `0` too. Each of those extra reveals carries its own information on top
-> of whatever $H(W \mid O_x = 0)$ already accounts for, so a cell whose `0` outcome would set off a
-> large cascade is worth more than the EIG computed here suggests. Scoring that properly means
-> enumerating, for every world, how far the cascade would actually spread, which is exactly the
-> kind of computation the frontier model exists to avoid, so this project leaves it out and reports
-> the single-cell figure instead.
+<div class="callout">
+  One outcome is treated a little loosely here. A `0` doesn't just narrow $W$ down on its own
+  account, in the real game it also triggers a cascade, auto-revealing every neighbouring cell and
+  recursing wherever those are `0` too. Each of those extra reveals carries its own information on top
+  of whatever $H(W \mid O_x = 0)$ already accounts for, so a cell whose `0` outcome would set off a
+  large cascade is worth more than the EIG computed here suggests. Scoring that properly means
+  enumerating, for every world, how far the cascade would actually spread, which is exactly the
+  kind of computation the frontier model exists to avoid, so this project leaves it out and reports
+  the single-cell figure instead.
+</div>
 
 ## Predicted versus realized
 
@@ -333,21 +347,7 @@ The widget below is a little demo of that. It's the same position as the trees a
 **A2** is live. Click it! An outcome is drawn at random, weighted by its real solver-computed
 probability, and when it's revealed you will see how much information it actually carried.
 
-<div class="demo" id="predicted-vs-realized">
-  <div class="demo-board"><canvas id="demo-canvas"></canvas></div>
-  <dl class="demo-readouts">
-    <div class="demo-readout">
-      <dt>Predicted EIG</dt>
-      <dd id="demo-predicted">?</dd>
-    </div>
-    <div class="demo-readout">
-      <dt>Realized information</dt>
-      <dd id="demo-realized">?</dd>
-    </div>
-    <button type="button" id="demo-reset" disabled>Re-roll</button>
-  </dl>
-  <p id="demo-narration"></p>
-</div>
+<RevealDemo client:visible />
 
 Re-roll it a few dozen times. Half the draws come back as a mine, which rules out the two worlds where A2 was safe
 and pays out $\log_2(4/2) = 1$ bit. The other half come back as a `2` or a
@@ -382,35 +382,31 @@ survives without it. What is left is [minimal](https://en.wikipedia.org/wiki/Uns
 (though not necessarily the smallest possible, or the only one).
 
 On the introduction's board:
-<span data-figure="open-board-certain-clues">B1, B2, C2</span> together force
-<span data-figure="open-board-certain-cell">A3</span> to be a mine, and dropping any one of the three leaves an
+{figures['open-board-certain-clues']} together force
+{figures['open-board-certain-cell']} to be a mine, and dropping any one of the three leaves an
 arrangement where it isn't.
 
 Hovering a certain cell in the game highlights what survives that trimming: the revealed
-:term-clue[clues] the argument rests on, and any unrevealed
-:term-premise[premise] cells whose own forced status it leans on.
+<span class="term-clue">clues</span> the argument rests on, and any unrevealed
+<span class="term-premise">premise</span> cells whose own forced status it leans on.
 
-::::figure{.board-figure}
-<img
-  src="/assets/explainer/certainty-board.svg"
-  alt="A toy board where C1 is certainly safe, with its two clue cells highlighted in aqua and its premise cell in green."
-/>
+<figure class="board-figure">
+  <img
+    src={illustration('certainty-board')}
+    alt="A toy board where C1 is certainly safe, with its two clue cells highlighted in aqua and its premise cell in green."
+  />
 
-:::figcaption
-A different board state, with one certainly-safe cell. Read it in two steps.
-<br />
-The `1` at E1 has exactly one unrevealed neighbour, so that neighbour must be
-the mine, the premise.
-<br />
-The other `1` at D2 sees only that premise and the ringed cell, and
-its single mine is already spoken for, so the next cell is safe.
-<br />
-In full: <span data-figure="certainty-focus">C1</span> is certainly safe because of the clues at
-<span class="term-clue" data-figure="certainty-clues">E1 and D2</span>, given that
-<span class="term-premise" data-figure="certainty-premises">D1</span>
-must be a mine.
-:::
-::::
+  <figcaption>
+    A different board state, with one certainly-safe cell. Read it in two steps.<br />
+    The `1` at E1 has exactly one unrevealed neighbour, so that neighbour must be
+    the mine, the premise.<br />
+    The other `1` at D2 sees only that premise and the ringed cell, and
+    its single mine is already spoken for, so the next cell is safe.<br />
+    In full: {figures['certainty-focus']} is certainly safe because of the clues at
+    <span class="term-clue">{figures['certainty-clues']}</span>, given that
+    <span class="term-premise">{figures['certainty-premises']}</span> must be a mine.
+  </figcaption>
+</figure>
 
 ## Reading the uncertainty chart
 
@@ -419,19 +415,19 @@ high, ends at zero, and records how the game went. Because each move's drop is t
 realized information of that move, and the drops form a telescoping series, the reveals of a finished
 game sum to exactly the uncertainty the board started with.
 
-::::figure
-<div class="figure-scroll">
-  <img
-    src="/assets/explainer/uncertainty-chart.svg"
-    alt="Total uncertainty in bits against total moves, falling from 42 to zero, annotated with one steep single-move cliff and one flat multi-move stretch."
-  />
-</div>
+<figure>
+  <div class="figure-scroll">
+    <img
+      src={illustration('uncertainty-chart')}
+      alt="Total uncertainty in bits against total moves, falling from 42 to zero, annotated with one steep single-move cliff and one flat multi-move stretch."
+    />
+  </div>
 
-:::figcaption
-An example trace. The annotated cliff is a single reveal that cascaded and eliminated most of what was still
-unknown. The flat stretch is three reveals that each confirmed something the solver had already pinned down.
-:::
-::::
+  <figcaption>
+    An example trace. The annotated cliff is a single reveal that cascaded and eliminated most of what was still
+    unknown. The flat stretch is three reveals that each confirmed something the solver had already pinned down.
+  </figcaption>
+</figure>
 
 Cliffs are high-surprisal moves: by (9), a reveal that cuts the world count by a factor of a thousand pays
 about ten bits, and the line falls off. Flat stretches are the opposite: reveals that were safe,

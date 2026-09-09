@@ -1,6 +1,6 @@
 // Composes the explainer's static illustrations from the fixed fixtures and the generators.
-// Everything here runs at build/dev-server-transform time inside the Vite plugin; nothing in
-// this module is shipped to the browser.
+// Everything here runs at build or dev-server time inside the Astro integration
+// (`illustrationsIntegration.ts`); nothing in this module is shipped to the browser.
 import { toLabel } from '../board/chessLabel.ts'
 import { type Coord, type SolverBoard } from '../solver/types.ts'
 import { renderBoardSvg } from './boardSvg.ts'
@@ -62,7 +62,7 @@ export function renderUnsolvedBoard(board: SolverBoard, focusCell: Coord | undef
 /**
  * Directory the illustrations are emitted into, relative to the site root. Deliberately the
  * same path in dev and in a build: the dev server serves these from memory and the build writes
- * them to `dist/`, and `explainer.html` references one URL either way.
+ * them to `dist/`, and the article references one URL either way.
  */
 export const ILLUSTRATION_DIR = 'assets/explainer'
 

@@ -1,0 +1,24 @@
+---
+/**
+ * The explainer article's frame: the prose column, the back-link, and the page's own stylesheet.
+ * Separate from `Site.astro` so the game page pays for none of it.
+ *
+ * Reached through `explainer.mdx`'s `layout:` frontmatter, which is why the title arrives inside
+ * `frontmatter` rather than as a plain prop.
+ */
+import '../design/explainer.css'
+import Site from './Site.astro'
+
+interface Props {
+  readonly frontmatter: { readonly title: string }
+}
+
+const { frontmatter } = Astro.props
+---
+
+<Site title={frontmatter.title} math>
+  <main id="explainer">
+    <a class="back-link" href={`${import.meta.env.BASE_URL}index.html`}>&#8592; Back to the game</a>
+    <slot />
+  </main>
+</Site>
