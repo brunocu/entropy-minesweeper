@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { Board } from '../../board/board.ts'
-import { DIFFICULTIES } from '../difficulty.ts'
+import { DIFFICULTIES, DIFFICULTY } from '../difficulty.ts'
 
 describe('board size/difficulty presets', () => {
   it('defines Beginner, Intermediate, and Expert presets with the standard dimensions and mine counts', () => {
-    const byName = new Map(DIFFICULTIES.map((d) => [d.name, d]))
-    expect(byName.get('Beginner')).toEqual({ name: 'Beginner', width: 9, height: 9, mineCount: 10 })
-    expect(byName.get('Intermediate')).toEqual({ name: 'Intermediate', width: 16, height: 16, mineCount: 40 })
-    expect(byName.get('Expert')).toEqual({ name: 'Expert', width: 30, height: 16, mineCount: 99 })
+    expect(DIFFICULTY.Beginner).toEqual({ name: 'Beginner', width: 9, height: 9, mineCount: 10 })
+    expect(DIFFICULTY.Intermediate).toEqual({ name: 'Intermediate', width: 16, height: 16, mineCount: 40 })
+    expect(DIFFICULTY.Expert).toEqual({ name: 'Expert', width: 30, height: 16, mineCount: 99 })
+  })
+
+  it('lists every preset in menu order, each keyed under its own name', () => {
+    expect(DIFFICULTIES).toEqual([DIFFICULTY.Beginner, DIFFICULTY.Intermediate, DIFFICULTY.Expert])
+    for (const [name, difficulty] of Object.entries(DIFFICULTY)) expect(difficulty.name).toBe(name)
   })
 
   it('each preset builds a board with matching dimensions and mine count', () => {

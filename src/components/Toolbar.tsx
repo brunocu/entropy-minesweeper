@@ -1,12 +1,12 @@
 import { createMemo, For } from 'solid-js'
-import { DIFFICULTIES } from '../lib/game/difficulty.ts'
+import { DIFFICULTIES, type DifficultyName } from '../lib/game/difficulty.ts'
 import type { GameController } from '../lib/game/gameController.ts'
 import { countFlags } from './boardQueries.ts'
 
 interface ToolbarProps {
   readonly game: () => GameController
-  readonly difficultyName: () => string
-  readonly onDifficultyChange: (name: string) => void
+  readonly difficultyName: () => DifficultyName
+  readonly onDifficultyChange: (name: DifficultyName) => void
   readonly onNewGame: () => void
 }
 
@@ -19,7 +19,7 @@ export function Toolbar(props: ToolbarProps) {
     <div class="toolbar">
       <select
         value={props.difficultyName()}
-        onChange={(event) => props.onDifficultyChange(event.currentTarget.value)}
+        onChange={(event) => props.onDifficultyChange(event.currentTarget.value as DifficultyName)}
       >
         <For each={DIFFICULTIES}>
           {(difficulty) => (

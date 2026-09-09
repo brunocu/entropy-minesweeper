@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { Board } from '../lib/board/board.ts'
 import { toLabel } from '../lib/board/chessLabel.ts'
-import { DIFFICULTIES, type Difficulty } from '../lib/game/difficulty.ts'
+import { DIFFICULTY, type Difficulty, type DifficultyName } from '../lib/game/difficulty.ts'
 import { GameController } from '../lib/game/gameController.ts'
 import { computeRevealFeedback } from '../lib/game/revealFeedback.ts'
 import type { Coord } from '../lib/solver/types.ts'
@@ -11,22 +11,21 @@ import { Readouts } from './Readouts.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import { UncertaintyChart } from './UncertaintyChart.tsx'
 
-/** Also the difficulty the chart is sized against, so its plot area lines up with the board's. */
-const INTERMEDIATE = DIFFICULTIES.find((d) => d.name === 'Intermediate') ?? DIFFICULTIES[0]
+const DEFAULT_DIFFICULTY = DIFFICULTY.Intermediate
 
 function newController(difficulty: Difficulty): GameController {
   return new GameController(new Board(difficulty.width, difficulty.height, difficulty.mineCount))
 }
 
 export function App() {
-  const [difficultyName, setDifficultyName] = createSignal(INTERMEDIATE.name)
+  const [difficultyName, setDifficultyName] = createSignal<DifficultyName>(DEFAULT_DIFFICULTY.name)
 
   /**
    * The whole game state behind one signal. `equals: false` lets both kinds of change travel the
    * same path: a new game replaces the instance, a reveal or flag mutates it in place, and a
    * default `===` signal would swallow the latter. Memos downstream contain the coarseness.
    */
-  const [game, setGame] = createSignal(newController(INTERMEDIATE), { equals: false })
+  const [game, setGame] = createSignal(newController(DEFAULT_DIFFICULTY), { equals: false })
 
   /**
    * Everything a hover drives is a function of the cell, not the pixel, so this equality turns a
@@ -40,10 +39,9 @@ export function App() {
   const [revealLine, setRevealLine] = createSignal('')
 
   function newGame(): void {
-    const difficulty = DIFFICULTIES.find((d) => d.name === difficultyName()) ?? DIFFICULTIES[0]
     setHoveredCell(null)
     setRevealLine('')
-    setGame(newController(difficulty))
+    setGame(newController(DIFFICULTY[difficultyName()]))
   }
 
   function reveal(cell: Coord): void {
@@ -89,7 +87,7 @@ export function App() {
           />
           <Readouts game={game} hoveredCell={hoveredCell} revealLine={revealLine} />
         </div>
-        <UncertaintyChart game={game} height={INTERMEDIATE.height * CELL_SIZE + BOARD_MARGIN_TOP} />
+        <UncertaintyChart game={game} height={DEFAULT_DIFFICULTY.height * CELL_SIZE + BOARD_MARGIN_TOP} />
       </div>
     </>
   )
