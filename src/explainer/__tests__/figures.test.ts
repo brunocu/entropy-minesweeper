@@ -4,8 +4,8 @@
 // quoted, or quoted and never computed (which renders as nothing at all). The values themselves are
 // correct by construction, not by drift-checking against a second hand-typed copy.
 import { describe, expect, it } from 'vitest'
-import { decompose } from '../../solver/decomposition.ts'
-import { solve } from '../../solver/probability.ts'
+import { decompose } from '../../lib/solver/decomposition.ts'
+import { solve } from '../../lib/solver/probability.ts'
 import { computeFigureValues } from '../figures.ts'
 import {
   CERTAINTY_BOARD,

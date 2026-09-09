@@ -1,17 +1,14 @@
-// Hand-authored, fixed toy scenarios for the explainer page's illustrations
-// Every fixture is a real, self-consistent minesweeper position:
-// each revealed cell's number is its true adjacent-mine count for the layout the scenario
-// describes, so the solver's answers about them are the answers a player would really get.
+// Hand-authored toy scenarios for the explainer's illustrations. Every fixture is a real,
+// self-consistent position - each revealed number is its true adjacent-mine count - so the solver's
+// answers here are the answers a player would get.
 //
-// Determinism is the point - "watch this specific deduction happen" only works if the
-// scenario never changes. No random generation anywhere in this module.
-import type { Coord, SolverBoard } from '../solver/types.ts'
-import type { UncertaintyHistoryPoint } from '../render/uncertaintyChart.ts'
+// Nothing is randomly generated: "watch this specific deduction happen" needs a fixed scenario.
+import type { Coord, SolverBoard } from '../lib/solver/types.ts'
+import type { UncertaintyHistoryPoint } from '../lib/uncertaintyHistory.ts'
 
 /**
- * Parses a compact grid literal into a `SolverBoard`: `?` is an unrevealed cell, a digit is
- * a revealed cell showing that adjacent-mine count. Keeps the fixtures below readable as
- * pictures of the board rather than as nested object literals.
+ * Parses a compact grid literal: `?` is an unrevealed cell, a digit a revealed adjacent-mine count.
+ * Keeps the fixtures below readable as pictures of the board.
  */
 function parseSolverBoard(rows: readonly string[], mineCount: number): SolverBoard {
   const cells = rows.map((row) =>
@@ -23,13 +20,11 @@ function parseSolverBoard(rows: readonly string[], mineCount: number): SolverBoa
 }
 
 /**
- * The introduction's trivial deduction: the smallest position where a clue has exactly one way
- * to be satisfied. A3's `1` touches a single unknown, A2, so A2 is a mine; take that as a
- * premise and B1's `1` is already accounted for, so A1 is safe. Two cells, no counting, no
- * search - the deduction almost every flag in an ordinary game comes from.
+ * The introduction's trivial deduction: the smallest position where a clue has exactly one way to
+ * be satisfied. A3's `1` touches a single unknown, A2, so A2 is a mine; take that as a premise and
+ * B1's `1` is accounted for, so A1 is safe. No counting, no search.
  *
- * Drawn without solver output, because the point of the figure is the deduction the reader
- * makes, not the answer the solver would paint on it.
+ * Drawn without solver output: the figure is about the deduction the reader makes.
  */
 export const TRIVIAL_BOARD: SolverBoard = parseSolverBoard(['?1', '?1', '11'], 1)
 
@@ -37,24 +32,20 @@ export const TRIVIAL_BOARD: SolverBoard = parseSolverBoard(['?1', '?1', '11'], 1
 export const TRIVIAL_FOCUS_CELL: Coord = { row: 1, col: 0 }
 
 /**
- * Worlds-tree scenario, shared by the probability and information-gain
- * illustrations. Five unknown cells; the pruned search over them ends in 12 tips, four of which
- * are consistent worlds.
+ * Worlds-tree scenario, shared by the probability and information-gain illustrations. Five unknown
+ * cells; the pruned search ends in 12 tips, four of them consistent worlds.
  *
- * The deduction: B1's `1` sees only A1 and A2, so exactly one of that pair is a mine; C2's `1`
- * sees only B3 and C3, so exactly one of that pair is too; B2's `3` sees all five unknowns, and
- * with those two mines accounted for, A3 must be the third. What is left is two independent
- * coin-flips - four worlds, two bits.
+ * The deduction: B1's `1` sees only A1 and A2, so exactly one of that pair is a mine; C2's `1` sees
+ * only B3 and C3, so exactly one of that pair is too; B2's `3` sees all five unknowns, and with
+ * those two accounted for A3 must be the third. Two independent coin-flips remain - four worlds.
  *
- * The focus cell A2 is the one worth clicking. It borders A1, A3 and B3, so its reading splits
- * the four worlds three ways (mine, or a 2, or a 3); A1 borders only A2, so its reading is a
- * single yes-or-no. Identical 50% risk, half a bit more information - the contrast the article
- * is built on - and A2's outcome groups differ in size, so the predicted-vs-realized demo gets
- * a realized value that actually varies between rolls.
+ * A2 is the focus cell. It borders A1, A3 and B3, so its reading splits the four worlds three ways
+ * (mine, 2, or 3); A1 borders only A2, so its reading is a single yes-or-no. Identical 50% risk,
+ * half a bit more information - the contrast the article is built on - and A2's outcome groups
+ * differ in size, so the predicted-vs-realized demo gets a realized value that varies between rolls.
  *
- * C1 is the only revealed blank, and every one of its neighbours is revealed: a 0 cascades, so
- * a board showing one next to an unknown is a position no game could reach. See the cascade-rule
- * test in fixtures.test.ts.
+ * C1 is the only revealed blank and all its neighbours are revealed: a 0 cascades, so a board
+ * showing one beside an unknown is unreachable. See the cascade-rule test in fixtures.test.ts.
  */
 export const WORLDS_TREE_BOARD: SolverBoard = parseSolverBoard(['?10', '?31', '???'], 3)
 
@@ -62,15 +53,12 @@ export const WORLDS_TREE_BOARD: SolverBoard = parseSolverBoard(['?10', '?31', '?
 export const WORLDS_TREE_FOCUS_CELL: Coord = { row: 1, col: 0 }
 
 /**
- * Certainty-explanation scenario, deliberately distinct from
- * the worlds-tree scenario because it demonstrates a different mechanism.
+ * Certainty-explanation scenario, distinct from the worlds-tree one because it demonstrates a
+ * different mechanism.
  *
- * The `1` at E2 has exactly one unrevealed neighbor, D1, so D1 must be the mine; the `1` at
- * D2 sees only D1 and C1, so with D1 spoken for, C1 is certainly safe. That two-step chain is
- * what the illustration's clue/premise highlighting shows: two clue cells and one premise cell.
- *
- * Trimmed to the informative rows for the same reason as the worlds-tree board: the two rows of
- * revealed blanks below these imposed no constraint and explained nothing.
+ * The `1` at E2 has exactly one unrevealed neighbor, D1, so D1 must be the mine; the `1` at D2 sees
+ * only D1 and C1, so with D1 spoken for C1 is certainly safe. That two-step chain is what the
+ * illustration's highlighting shows: two clue cells and one premise cell.
  */
 export const CERTAINTY_BOARD: SolverBoard = parseSolverBoard(['????1', '?2211'], 3)
 
@@ -78,9 +66,9 @@ export const CERTAINTY_BOARD: SolverBoard = parseSolverBoard(['????1', '?2211'],
 export const CERTAINTY_FOCUS_CELL: Coord = { row: 0, col: 2 }
 
 /**
- * Canned uncertainty trace. Move 3 is the cliff - one reveal that
- * cascades and collapses most of the board's remaining uncertainty; moves 3 through 6 are the
- * flat stretch, three reveals that each confirm something the solver had largely pinned down.
+ * Canned uncertainty trace. Move 3 is the cliff - one reveal that cascades and collapses most of
+ * the remaining uncertainty; moves 4 through 6 are the flat stretch, reveals that each confirm
+ * something the solver had largely pinned down.
  */
 export const UNCERTAINTY_TRACE: readonly UncertaintyHistoryPoint[] = [
   { moveIndex: 0, totalEntropyBits: 42.0 },

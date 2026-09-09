@@ -1,6 +1,7 @@
 import solidPlugin from 'vite-plugin-solid'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
+import { tokensCss } from './tokensCssPlugin.ts'
 
 /**
  * `vite-plugin-solid` prepends the `browser` export condition whenever Vite's mode is `test`. That
@@ -17,31 +18,30 @@ function solidTransformOnly(): Plugin {
 }
 
 /**
- * Vitest only. The site itself is built by Astro (`astro.config.mjs`); this file exists for the test
- * runner, which needs the Solid transform and `base` (the game's explainer link is asserted against
- * `import.meta.env.BASE_URL`).
+ * The test runner's config. `tokensCss()` appears here and in `astro.config.mjs`, which does not
+ * read this file. `base` backs the `import.meta.env.BASE_URL` the game's explainer link asserts.
  */
 export default defineConfig({
   base: '/entropy-minesweeper/',
   test: {
     projects: [
       {
-        plugins: [solidTransformOnly()],
+        plugins: [tokensCss(), solidTransformOnly()],
         test: {
           name: 'unit',
-          /* No DOM by design: `boardRenderer.test.ts` and friends stub the Canvas2D surface they
-           * need, and several tests read fixtures through `import.meta.url`, which jsdom rewrites
-           * to an `http:` URL they cannot open. */
+          /* No DOM by design, and several of these read fixtures through `import.meta.url`, which
+           * jsdom rewrites to an `http:` URL they cannot open. */
           environment: 'node',
-          include: ['src/**/*.test.ts'],
+          /* Pure logic and build-time generators - the tiers that touch no browser API. */
+          include: ['src/{lib,explainer}/**/*.test.?(c|m)[jt]s?(x)'],
         },
       },
       {
-        plugins: [solidPlugin()],
+        plugins: [tokensCss(), solidPlugin()],
         test: {
           name: 'ui',
           environment: 'jsdom',
-          include: ['src/**/*.test.tsx'],
+          include: ['src/{components,canvas}/**/*.test.?(c|m)[jt]s?(x)'],
         },
       },
     ],

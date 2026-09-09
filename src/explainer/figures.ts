@@ -1,13 +1,10 @@
 // The numbers and cell labels the article quotes in its prose, computed from the real solver rather
 // than typed in. This is the guarantee the explainer is built around: the article cannot drift from
-// the code it describes, because every figure in it is a solve.
-//
-// The article reaches these by importing this module and interpolating `{figures['name']}`. It used
-// to reach them through a regular expression that rewrote `data-figure` spans in the compiled HTML
-// string; the guarantee was the same, the mechanism was a liability.
-import { toLabel } from '../board/chessLabel.ts'
-import { computeExplanations } from '../solver/explanation.ts'
-import { key } from '../solver/types.ts'
+// the code it describes, because every figure in it is a solve. The article reaches these by
+// importing this module and interpolating `{figures['name']}`.
+import { toLabel } from '../lib/board/chessLabel.ts'
+import { computeExplanations } from '../lib/solver/explanation.ts'
+import { key } from '../lib/solver/types.ts'
 import { CERTAINTY_BOARD, CERTAINTY_FOCUS_CELL, WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from './fixtures.ts'
 import { solveFixture } from './solvedFixture.ts'
 import { buildWorldsTreeModel } from './worldsTree.ts'

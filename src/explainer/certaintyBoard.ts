@@ -1,9 +1,9 @@
-// The explainer's certainty-explanation illustration: the fixed toy board with one certain
-// cell's explanation set already highlighted, since a still picture has no hover to ask for it. The drawing itself is `boardSvg.ts`; this module's job is to run the
-// real `computeExplanations` against the fixture and turn its answer into that drawing's inputs.
-import { toLabel } from '../board/chessLabel.ts'
-import { computeExplanations } from '../solver/explanation.ts'
-import type { Coord } from '../solver/types.ts'
+// The certainty-explanation illustration: the toy board with one certain cell's explanation set
+// already highlighted, since a still picture has no hover to ask for it. `boardSvg.ts` draws it;
+// this module runs the real `computeExplanations` and turns its answer into that drawing's inputs.
+import { toLabel } from '../lib/board/chessLabel.ts'
+import { computeExplanations } from '../lib/solver/explanation.ts'
+import type { Coord } from '../lib/solver/types.ts'
 import { renderBoardSvg } from './boardSvg.ts'
 import type { SolvedFixture } from './solvedFixture.ts'
 

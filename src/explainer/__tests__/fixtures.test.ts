@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { toLabel } from '../../board/chessLabel.ts'
-import { decompose } from '../../solver/decomposition.ts'
-import { computeExplanations } from '../../solver/explanation.ts'
-import { solve } from '../../solver/probability.ts'
-import type { SolveResult } from '../../solver/types.ts'
+import { toLabel } from '../../lib/board/chessLabel.ts'
+import { decompose } from '../../lib/solver/decomposition.ts'
+import { computeExplanations } from '../../lib/solver/explanation.ts'
+import { solve } from '../../lib/solver/probability.ts'
+import type { SolveResult } from '../../lib/solver/types.ts'
 import {
   CERTAINTY_BOARD,
   CERTAINTY_FOCUS_CELL,

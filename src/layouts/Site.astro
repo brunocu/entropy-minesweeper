@@ -1,20 +1,16 @@
 ---
 /**
- * The shell both pages share, so the game and the explainer read as one site rather than two.
- *
- * It carries only what is genuinely common - the document scaffolding and the design tokens. Each
- * page brings its own stylesheet on top (`game.css`, `explainer.css`), mirroring the split
- * `unify-design-tokens` established: tokens are shared, page chrome is not.
+ * The shell both pages share, so the game and the explainer read as one site rather than two. It
+ * carries only what is common - the document scaffolding and the design tokens - and each page
+ * brings its own stylesheet on top: tokens are shared, page chrome is not.
  */
-import '../design/tokens.css'
+import 'virtual:tokens.css'
 
 interface Props {
   readonly title: string
   /**
-   * Whether to load MathJax. Only the explainer has formulas, and the CDN bundle is far too large
-   * to ship to a page with nothing for it to typeset - so the layout owns the tag (there is one
-   * right way to load MathJax, and it should not be copied per page) while the page decides
-   * whether it is wanted.
+   * Whether to load MathJax. The CDN bundle is far too large to ship to a page with nothing to
+   * typeset, so the layout owns the tag and the page decides whether it is wanted.
    */
   readonly math?: boolean
 }

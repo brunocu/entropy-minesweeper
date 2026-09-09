@@ -5,15 +5,15 @@
 //
 // Shared by the certainty-explanation illustration and by the root-board panels that sit above
 // the worlds trees, so a cell is the same color in every figure on the page.
-import { toLabel } from '../board/chessLabel.ts'
+import { toLabel } from '../lib/board/chessLabel.ts'
 import {
   CLUE_HIGHLIGHT_COLOR,
   eigGradientColor,
   PREMISE_HIGHLIGHT_COLOR,
   probabilityColor,
-} from '../render/probabilityColor.ts'
-import { cellSolverValues } from '../render/cellSolverValues.ts'
-import type { Coord, SolveResult, SolverBoard } from '../solver/types.ts'
+} from '../lib/scale/probabilityColor.ts'
+import { cellSolverValues } from '../lib/scale/cellSolverValues.ts'
+import type { Coord, SolveResult, SolverBoard } from '../lib/solver/types.ts'
 
 /** Accent for "this is the cell under discussion", matching the EIG scale's violet. */
 const FOCUS_COLOR = '#4a3aa7'
@@ -42,11 +42,10 @@ function escapeXml(text: string): string {
 /**
  * Renders a `SolverBoard` as standalone inline SVG markup.
  *
- * Takes the solve rather than running one, so a fixture solved once can be drawn several ways
- * Pass `null` for a board drawn without solver output - every
- * unrevealed cell a plain covered square, no probability fill, no EIG ramp, no certainty ring.
- * The introduction's boards are positions posed as questions, and painting the solver's answer
- * onto them answers the question before the reader has been asked it.
+ * Takes the solve rather than running one, so a fixture solved once can be drawn several ways.
+ * Pass `null` to draw without solver output - every unrevealed cell a plain covered square. The
+ * introduction's boards are positions posed as questions, and painting the answer onto them would
+ * answer the question before the reader is asked it.
  */
 export function renderBoardSvg(board: SolverBoard, result: SolveResult | null, options: BoardSvgOptions = {}): string {
   const cellSize = options.cellSize ?? 54
@@ -62,9 +61,8 @@ export function renderBoardSvg(board: SolverBoard, result: SolveResult | null, o
   const certainSafeEigs = frontier.filter((f) => f.probability === 0).map((f) => f.eig)
   const maxEig = certainSafeEigs.length > 0 ? Math.max(...certainSafeEigs) : null
 
-  // Margin reserved on all four sides so the grid sits centered in the canvas even though labels
-  // only occupy the left and top gutters - without a matching right/bottom margin the grid itself
-  // (not just the label gutter) reads as skewed right and down once the SVG is centered on the page.
+  // Margin on all four sides even though labels occupy only the left and top gutters: without the
+  // matching right/bottom margin the grid reads as skewed once the SVG is centered on the page.
   const width = board.width * cellSize + margin * 2
   const height = board.height * cellSize + margin * 2
   const parts: string[] = []

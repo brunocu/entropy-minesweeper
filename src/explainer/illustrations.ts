@@ -1,8 +1,7 @@
 // Composes the explainer's static illustrations from the fixed fixtures and the generators.
-// Everything here runs at build or dev-server time inside the Astro integration
-// (`illustrationsIntegration.ts`); nothing in this module is shipped to the browser.
-import { toLabel } from '../board/chessLabel.ts'
-import { type Coord, type SolverBoard } from '../solver/types.ts'
+// Runs at build time behind the endpoint that serves them; nothing here reaches the browser.
+import { toLabel } from '../lib/board/chessLabel.ts'
+import { type Coord, type SolverBoard } from '../lib/solver/types.ts'
 import { renderBoardSvg } from './boardSvg.ts'
 import { renderCertaintyBoard } from './certaintyBoard.ts'
 import {
@@ -60,31 +59,24 @@ export function renderUnsolvedBoard(board: SolverBoard, focusCell: Coord | undef
 }
 
 /**
- * Directory the illustrations are emitted into, relative to the site root. Deliberately the
- * same path in dev and in a build: the dev server serves these from memory and the build writes
- * them to `dist/`, and the article references one URL either way.
+ * Directory the illustrations are served from, relative to the site root. The endpoint's path is
+ * its filename and cannot read this, so `illustrationFiles.test.ts` pins the two together.
  */
 export const ILLUSTRATION_DIR = 'assets/explainer'
 
-export interface IllustrationFile {
-  /** Path relative to the site root, e.g. `assets/explainer/worlds-tree-eig.svg`. */
-  readonly fileName: string
+export interface Illustration {
+  /** URL name, bare: no directory, no extension. e.g. `worlds-tree-eig`. */
+  readonly name: string
   /** Complete, standalone SVG document. */
   readonly source: string
 }
 
 /**
- * Every illustration the explainer page loads, as its own SVG file.
- *
- * Emitted as files rather than inlined into the HTML so the browser can cache them separately
- * from the article and so the page stays legible to read and edit. The worlds-tree root board
- * appears above both trees and is one file referenced twice, which inlining could not do.
+ * Every illustration the explainer page loads, as its own SVG file - separately cacheable, and the
+ * worlds-tree root board is one file referenced twice, which inlining could not do.
  */
-export function buildIllustrationFiles(): IllustrationFile[] {
-  const file = (name: string, source: string): IllustrationFile => ({
-    fileName: `${ILLUSTRATION_DIR}/${name}.svg`,
-    source,
-  })
+export function buildIllustrationFiles(): Illustration[] {
+  const file = (name: string, source: string): Illustration => ({ name, source })
 
   // One solve per fixture for the whole build: the root board, both worlds trees and the
   // certainty board below are all drawn from these, so they cannot disagree.

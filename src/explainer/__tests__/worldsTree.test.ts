@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getEnumerationCallCountForTest,
   resetEnumerationCallCountForTest,
-} from '../../solver/instrumentation.ts'
+} from '../../lib/solver/instrumentation.ts'
 import { solveFixture } from '../solvedFixture.ts'
 import { WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { buildWorldsTreeModel, renderWorldsTree } from '../worldsTree.ts'

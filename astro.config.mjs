@@ -7,20 +7,24 @@ import solid from '@astrojs/solid-js'
 import { defineConfig } from 'astro/config'
 import rehypeMathjax from 'rehype-mathjax/browser'
 import remarkMath from 'remark-math'
-import { explainerIllustrations } from './src/explainer/illustrationsIntegration.ts'
+import { tokensCss } from './tokensCssPlugin.ts'
 
 // https://astro.build/config
 export default defineConfig({
   site: 'https://brunocu.github.io',
   base: '/entropy-minesweeper/',
 
-  integrations: [mdx(), solid(), explainerIllustrations()],
+  integrations: [mdx(), solid()],
 
-  /**
-   * `file` rather than Astro's default `directory`, so the pages keep emitting `index.html` and
-   * `explainer.html` at the URLs they already have. The game's explainer link and the deployed
-   * site's bookmarks both point at `explainer.html`; there is nothing to gain from moving them.
-   */
+  vite: {
+    plugins: [tokensCss()],
+    build: {
+      sourcemap: true,
+    },
+  },
+
+  compressHTML: false,
+
   build: {
     format: 'file',
   },

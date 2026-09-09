@@ -1,10 +1,6 @@
-// Reads the article the way the tests below need to see it.
-//
-// These used to read the *compiled* page, because the values and image URLs only existed after
-// `compileExplainer()` had rewritten an HTML string. In MDX they are ordinary source constructs -
-// `{figures['name']}` and `illustration('name')` - so the article itself is the thing to assert
-// against, and no build has to run first. `npm test` gates `npm run build` in CI, so a test that
-// needed `dist/` could not run there at all.
+// Reads the article the way the tests need to see it. `{figures['name']}` and `illustration('name')`
+// are ordinary MDX source constructs, so the article itself is what gets asserted against and no
+// build has to run first - which matters because `npm test` gates `npm run build` in CI.
 import { readFile } from 'node:fs/promises'
 
 const ARTICLE = new URL('../../../pages/explainer.mdx', import.meta.url)

@@ -1,17 +1,14 @@
-// Guards the article's TeX. The page's formulas are typeset by MathJax in the reader's browser,
-// so nothing in the build would notice a malformed one - it would ship and render as red error
-// text on the live page. This runs the same TeX parser over every formula in the article and fails
-// the suite instead.
+// Guards the article's TeX. Formulas are typeset by MathJax in the reader's browser, so nothing in
+// the build notices a malformed one - it ships and renders as red error text. This runs the same
+// TeX parser over every formula and fails the suite instead.
 //
-// It reads the `.mdx` source rather than the built page: `remark-math` copies the TeX between the
-// `$` delimiters through verbatim into the `\(...\)` the browser sees, so the source carries the
-// same grammar, and a test that needed `dist/` could not run in CI, where `npm test` gates
-// `npm run build`.
+// Reads the `.mdx` source rather than the built page: `remark-math` copies the TeX between the `$`
+// delimiters through verbatim, so the source carries the same grammar, and a test needing `dist/`
+// could not run in CI where `npm test` gates `npm run build`.
 //
-// `mathjax-full` is a devDependency for this test alone: it is never imported by the app, the
-// build, or the page, which loads its own copy from a CDN. It's the same package (and major
-// version) `rehype-mathjax` itself depends on, so this validates against the same TeX grammar the
-// page's own math pipeline expects.
+// `mathjax-full` is a devDependency for this test alone - the page loads its own copy from a CDN.
+// It is the same package and major version `rehype-mathjax` depends on, so this validates against
+// the grammar the page's own pipeline expects.
 import type { LiteDocument } from 'mathjax-full/js/adaptors/lite/Document.js'
 import type { LiteElement } from 'mathjax-full/js/adaptors/lite/Element.js'
 import type { LiteText } from 'mathjax-full/js/adaptors/lite/Text.js'

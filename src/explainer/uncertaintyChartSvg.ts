@@ -1,7 +1,7 @@
 // Build-time SVG generator for the explainer's canned uncertainty chart.
 // The live game plots this data with uPlot; here the trace is fixed, so it is plotted directly
 // into static markup rather than shipping a chart library to draw one unchanging line.
-import type { UncertaintyHistoryPoint } from '../render/uncertaintyChart.ts'
+import type { UncertaintyHistoryPoint } from '../lib/uncertaintyHistory.ts'
 
 const WIDTH = 720
 const HEIGHT = 320
@@ -76,9 +76,8 @@ export function renderUncertaintyChart(
     )
   }
 
-  // Callouts. A point annotation gets a vertical drop line at that move; a span gets a bracket
-  // over the moves it covers, so "one reveal did this" and "these three reveals did that" read
-  // as different shapes rather than differently-worded labels.
+  // A point annotation gets a vertical drop line at that move; a span gets a bracket over the moves
+  // it covers, so the two read as different shapes rather than differently-worded labels.
   annotations.forEach((annotation, index) => {
     const [from, to] = annotation.span
     const isPoint = from === to

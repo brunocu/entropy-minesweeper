@@ -1,20 +1,16 @@
-// Build-time SVG generator for the explainer's worlds-tree illustrations. One generator, two
-// modes, one fixed toy scenario: probability mode highlights the surviving branches where the
-// focus cell is a mine, EIG mode groups the same surviving branches by what revealing that
-// cell would show.
+// Build-time SVG generator for the worlds-tree illustrations. Two modes over one fixed scenario:
+// probability mode highlights the surviving branches where the focus cell is a mine, EIG mode
+// groups those same branches by what revealing the cell would show.
 //
-// Both modes read the same `solve` output the real solver derives its probabilities and EIG
-// from - the worlds and the numbers come back from one call - so the picture cannot disagree
-// with the numbers.
+// Both modes read one `solve` call - worlds and numbers together - so the picture cannot disagree
+// with the numbers beside it.
 //
-// The tree is pruned, not complete: a branch stops at the depth where the clues rule it out,
-// rather than fanning out to 2^n leaves most of which are dead. That is also how the solver
-// works - `enumerateComponentFull` backtracks as soon as a partial assignment stops being
-// consistent - so the drawing shows the search that actually runs.
-import { toLabel } from '../board/chessLabel.ts'
-import { EIG_HIGH_COLOR, MINE_POLE_COLOR, SAFE_POLE_COLOR } from '../render/probabilityColor.ts'
-import { outcomeKey, type WeightedWorld } from '../solver/probability.ts'
-import type { Coord, SolverBoard } from '../solver/types.ts'
+// The tree is pruned, not complete: a branch stops where the clues rule it out rather than fanning
+// out to 2^n mostly-dead leaves, which is what `enumerateComponentFull` does too.
+import { toLabel } from '../lib/board/chessLabel.ts'
+import { EIG_HIGH_COLOR, MINE_POLE_COLOR, SAFE_POLE_COLOR } from '../lib/scale/probabilityColor.ts'
+import { outcomeKey, type WeightedWorld } from '../lib/solver/probability.ts'
+import type { Coord, SolverBoard } from '../lib/solver/types.ts'
 import type { SolvedFixture } from './solvedFixture.ts'
 
 export type WorldsTreeMode = 'probability' | 'eig'
@@ -86,11 +82,10 @@ function matches(world: WeightedWorld, cellOrder: readonly Coord[], path: readon
 }
 
 /**
- * What the focus cell would show in one world. Only defined when every unrevealed neighbor of
- * the focus cell is itself a frontier cell - otherwise a single world spreads across several
- * outcomes via the non-frontier hypergeometric term (`computeFrontierCellResult`), and a tip
- * could not carry one outcome label. Every fixture this generator draws satisfies that, and
- * the throw keeps a future fixture from silently getting a wrong picture.
+ * What the focus cell would show in one world. Defined only when every unrevealed neighbor of the
+ * focus cell is itself a frontier cell - otherwise one world spreads across several outcomes via
+ * the non-frontier hypergeometric term (`computeFrontierCellResult`) and a tip could not carry a
+ * single outcome label. The throw guards a future fixture from a silently wrong picture.
  */
 function outcomeInWorld(board: SolverBoard, focusCell: Coord, world: WeightedWorld): string {
   if (world.assignment.get(key(focusCell)) === 1) return outcomeKey({ type: 'mine' })
@@ -125,10 +120,9 @@ function groupTips(tips: readonly TreeTip[]): OutcomeGroup[] {
   })
 
   return [...byOutcome].map(([outcome, tipIndices]) => {
-    // The illustration draws each group as one bracket spanning its tips, which is only
-    // truthful for a contiguous run. Branching the focus cell first makes the mine group
-    // contiguous by construction; a fixture whose safe outcomes interleave would need a
-    // different drawing, so refuse rather than mislabel.
+    // Each group is drawn as one bracket spanning its tips, truthful only for a contiguous run.
+    // Branching the focus cell first makes the mine group contiguous by construction; a fixture
+    // whose safe outcomes interleave needs a different drawing, so refuse rather than mislabel.
     const surviving = tips.map((tip, i) => ({ tip, i })).filter(({ tip }) => tip.surviving)
     const first = surviving.findIndex(({ i }) => i === tipIndices[0])
     const run = surviving.slice(first, first + tipIndices.length).map(({ i }) => i)
@@ -163,18 +157,17 @@ interface BuiltTree {
  * dead branch off, and what survives, plus the laid-out node tree the drawing walks.
  */
 function buildTree(fixture: SolvedFixture, focusCell: Coord, mode: WorldsTreeMode): BuiltTree {
-  // One enumeration for both halves of the picture: the branches come from `worlds`, the numbers
-  // quoted beside them from `result`. Both arrive already solved, so the two trees drawn from
-  // this fixture cannot disagree with each other.
+  // One enumeration for both halves of the picture: branches from `worlds`, the numbers quoted
+  // beside them from `result`.
   const { board, result, worlds } = fixture
   // Frontier order is the solver's own enumeration order - the demo's branching order.
   const frontierCells = result.frontier
   const focus = result.frontierByKey.get(key(focusCell))
   if (!focus) throw new Error(`focus cell ${toLabel(focusCell.row, focusCell.col)} is not a frontier cell`)
 
-  // The focus cell is always the root. In EIG mode that makes the outcome being grouped the
-  // tree's own top-level split; in probability mode it gathers the branches where the focus is
-  // a mine into one contiguous run, which is what lets the drawing bracket them.
+  // The focus cell is always the root: in EIG mode the grouped outcome becomes the tree's top-level
+  // split, and in probability mode the mine branches gather into the one contiguous run a bracket
+  // can span.
   const cellOrder = [focusCell, ...frontierCells.filter((c) => key(c) !== key(focusCell))]
 
   const tips: TreeTip[] = []
@@ -185,8 +178,8 @@ function buildTree(fixture: SolvedFixture, focusCell: Coord, mode: WorldsTreeMod
     const consistent = worlds.filter((w) => matches(w, cellOrder, path))
 
     if (consistent.length === 0) {
-      // Cut here: no consistent world extends this prefix, and drawing its subtree would only
-      // add branches that are dead for a reason already visible at this node.
+      // No consistent world extends this prefix; its subtree is dead for a reason already visible
+      // at this node.
       tips.push({ path: [...path], surviving: false, weight: 0, highlighted: false, outcome: null })
       return { path: [...path], children: [], tipIndex: tips.length - 1, y: 0 }
     }

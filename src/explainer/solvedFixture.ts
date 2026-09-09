@@ -1,13 +1,7 @@
 // One authoritative solve of one fixed board, threaded through the illustration pipeline.
-//
-// The explainer's fixtures are constants, so every generator that wants numbers off one could
-// solve it for itself. The argument for solving each once instead is coherence rather than
-// speed: independent solves of one fixed board are independent chances for the figures to
-// disagree with each other. Passed explicitly rather than memoized so there is visibly one
-// solve per fixture, not many cheap ones.
-import { decompose, type Decomposition } from '../solver/decomposition.ts'
-import { solve, type WeightedWorld } from '../solver/probability.ts'
-import type { SolveResult, SolverBoard } from '../solver/types.ts'
+import { decompose, type Decomposition } from '../lib/solver/decomposition.ts'
+import { solve, type WeightedWorld } from '../lib/solver/probability.ts'
+import type { SolveResult, SolverBoard } from '../lib/solver/types.ts'
 
 export interface SolvedFixture {
   /** The board these results describe, carried so the two cannot be paired wrongly. */

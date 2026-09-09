@@ -4,9 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/generate-tokens.mjs",
     "dev": "astro dev",
-    "prebuild": "node scripts/generate-tokens.mjs",
     "build": "tsc && astro build",
     "preview": "astro preview",
     "test": "vitest run"

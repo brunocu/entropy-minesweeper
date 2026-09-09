@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { CLUE_HIGHLIGHT_COLOR, PREMISE_HIGHLIGHT_COLOR } from '../../render/probabilityColor.ts'
-import { computeExplanations } from '../../solver/explanation.ts'
+import { CLUE_HIGHLIGHT_COLOR, PREMISE_HIGHLIGHT_COLOR } from '../../lib/scale/probabilityColor.ts'
+import { computeExplanations } from '../../lib/solver/explanation.ts'
 import { renderCertaintyBoard } from '../certaintyBoard.ts'
 import { CERTAINTY_BOARD, CERTAINTY_FOCUS_CELL } from '../fixtures.ts'
 import { solveFixture } from '../solvedFixture.ts'

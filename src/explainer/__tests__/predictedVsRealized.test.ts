@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { decompose } from '../../solver/decomposition.ts'
-import { solve } from '../../solver/probability.ts'
-import { mulberry32 } from '../../__tests__/support/prng.ts'
+import { decompose } from '../../lib/solver/decomposition.ts'
+import { solve } from '../../lib/solver/probability.ts'
+import { mulberry32 } from '../../lib/__tests__/support/prng.ts'
 import { WORLDS_TREE_BOARD, WORLDS_TREE_FOCUS_CELL } from '../fixtures.ts'
 import { pickWeighted, simulateReveal, worldCount } from '../predictedVsRealized.ts'
 
